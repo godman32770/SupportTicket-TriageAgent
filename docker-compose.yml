@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  triage:
+    build: .
+    image: support-triage-agent:latest
+    container_name: support-triage-agent
+    environment:
+      # Set OPENAI_API_KEY here or pass via CLI/docker run
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+    volumes:
+      - ./tickets:/app/tickets:ro
+    entrypoint: ["python", "-m", "app.cli.main"]
+    command: ["--ticket-file", "/app/tickets/sample_ticket.json", "--mode", "offline"]
+    restart: "no"
+
+# Usage:
+#  - docker compose up --build
+#  - To run in live mode with an API key:
+#      OPENAI_API_KEY=sk_xxx docker compose up --build
+#  - To override the command and run different tickets:
+#      docker compose run --rm triage -- --ticket-file /app/tickets/other.json --mode offline

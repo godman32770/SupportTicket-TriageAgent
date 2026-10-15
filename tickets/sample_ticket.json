@@ -1,0 +1,9 @@
+﻿{
+  "ticket_id": "T-100",
+  "customer_id": "C-100",
+  "product": "mobile_app",
+  "issue_type": "login",
+  "description": "I cannot log in after password reset and it is urgent.",
+  "language": "en",
+  "sentiment": "frustrated"
+}
