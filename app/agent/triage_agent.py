@@ -1,33 +1,85 @@
 from __future__ import annotations
 
 import json
+import logging
+import time
 from collections.abc import Mapping
 from typing import Any
 
 from app.guardrails.policy import PolicyGuardrail
 from app.guardrails.schema_validator import SchemaValidator
-from app.llm.client import LLMClient, OfflineLLMClient, OpenAIChatClient
+from app.llm.client import LLMClient, LLMConfigurationError, OfflineLLMClient, OpenAIChatClient
 from app.models import normalize_ticket
 from app.models.triage import SupportTicket, TriageDecision
+from app.telemetry.metrics import TelemetryEvent, TelemetryRecorder
+from app.telemetry.redaction import redact_pii
 from app.tools import CustomerHistoryTool, KBLookupTool
+
+logger = logging.getLogger(__name__)
+
+
+class ToolSpec:
+    def __init__(self, name: str, description: str, executor: Any) -> None:
+        self.name = name
+        self.description = description
+        self.executor = executor
+
+
+class ToolRegistry:
+    def __init__(self, customer_tool: CustomerHistoryTool, kb_tool: KBLookupTool) -> None:
+        self._tools = {
+            "customer_history": ToolSpec(
+                "customer_history",
+                "Fetch prior customer support history for the customer_id.",
+                lambda ticket: customer_tool.fetch(str(ticket.get("customer_id", ""))),
+            ),
+            "knowledge_base": ToolSpec(
+                "knowledge_base",
+                "Look up issue-specific knowledge-base guidance for the product and issue type.",
+                lambda ticket: kb_tool.lookup(
+                    str(ticket.get("product", "")),
+                    str(ticket.get("issue_type", "")),
+                ),
+            ),
+        }
+
+    def available(self) -> list[str]:
+        return list(self._tools)
+
+    def get(self, name: str) -> ToolSpec | None:
+        return self._tools.get(name)
+
+    def execute(self, ticket: Mapping[str, Any], name: str) -> Any:
+        spec = self.get(name)
+        if spec is None:
+            raise ValueError(f"Unknown tool: {name}")
+        return spec.executor(ticket)
 
 #CLASSIFy URGENCY, EXTRACT FIELDS, DECIDE ACTION, REASON SAFELY, RETURN JSON ONLY
 
 def build_safe_fallback(ticket: SupportTicket, history: str, kb: str) -> dict[str, Any]:
     description = (ticket.description or "").lower()
-    urgency = "low"
-    action = "auto_respond"
+    text = f"{description} {ticket.issue_type or ''}".lower()
 
-    if any(token in description for token in ["security", "critical", "data loss", "outage", "breach", "urgent"]):
-        urgency = "critical"
-        action = "escalate_to_human"
-    elif any(token in description for token in ["billing", "payment", "refund", "login", "crash", "slow", "error", "cannot access"]):
-        urgency = "medium"
-        action = "route_to_specialist"
-    elif any(token in description for token in ["help", "question", "bug"]):
-        urgency = "high"
-        action = "route_to_specialist"
-    #fallback to low urgency and auto_respond if no keywords match
+    critical_tokens = ("security", "breach", "data loss", "outage", "down", "legal", "urgent")
+    urgency = "critical" if any(token in text for token in critical_tokens) else "high"
+    action = "escalate_to_human"
+
+    intent_map = {
+        "login": "login_help",
+        "billing": "billing_dispute",
+        "outage": "service_outage",
+        "services": "service_outage",
+        "security": "security_threat",
+        "legal": "legal_threat",
+        "bug": "bug_report",
+        "feature_request": "feature_request",
+        "general_help": "support_help",
+        "prompt_injection": "prompt_injection",
+    }
+    issue_key = (ticket.issue_type or "general_help").strip().lower()
+    fallback_intent = intent_map.get(issue_key, "support_help")
+
     return {
         "ticket_id": ticket.ticket_id,
         "urgency": urgency,
@@ -35,10 +87,10 @@ def build_safe_fallback(ticket: SupportTicket, history: str, kb: str) -> dict[st
         "issue_type": ticket.issue_type,
         "sentiment": ticket.sentiment or "neutral",
         "language": ticket.language or "en",
-        "intents": [ticket.issue_type or "support_help"],
+        "intents": [fallback_intent],
         "action": action,
-        "confidence": 0.65,
-        "reasoning": "Fallback triggered because the model output or tool context was invalid or unsafe.",
+        "confidence": 0.0,
+        "reasoning": "Fallback triggered because the model output, tool context, or policy check was invalid or unsafe; the system escalated to a human for safety.",
         "customer_history_summary": history,
         "kb_summary": kb,
         "safety_checks": ["fallback guardrail applied"],
@@ -54,54 +106,226 @@ class TriageAgent:
         llm_client: LLMClient | None = None,
         api_key: str | None = None,
         model: str = "gpt-4o-mini",
+        max_model_retries: int = 2,
+        max_tool_calls: int = 2,
     ) -> None:
+        if max_model_retries < 0:
+            raise ValueError("max_model_retries must be non-negative.")
+        if max_tool_calls < 0:
+            raise ValueError("max_tool_calls must be non-negative.")
         self.mode = mode
         self.customer_tool = customer_tool or CustomerHistoryTool()
         self.kb_tool = kb_tool or KBLookupTool()
         self.api_key = api_key
         self.model = model
+        self.max_model_retries = max_model_retries
+        self.max_tool_calls = max_tool_calls
         self.llm_client = llm_client or self._build_llm_client()
+        self.tool_registry = ToolRegistry(self.customer_tool, self.kb_tool)
         self.policy_guardrail = PolicyGuardrail()
         self.schema_validator = SchemaValidator()
+        self.telemetry = TelemetryRecorder()
+        self.last_run_metrics: dict[str, Any] = {}
 
     def _build_llm_client(self) -> LLMClient:
         if self.mode == "live":
             return OpenAIChatClient(api_key=self.api_key, model=self.model)
         return OfflineLLMClient()
 
+    def _record_event(self, event: str, ticket_id: str | None, **kwargs: Any) -> None:
+        self.telemetry.record(TelemetryEvent(event=event, ticket_id=ticket_id, **kwargs))
+
+    def _normalize_aliases(self, response: dict[str, Any]) -> dict[str, Any]:
+        normalized = dict(response)
+
+        issue_type = str(normalized.get("issue_type", "")).strip().lower()
+        if issue_type in {"settings", "settings_question", "general_help", "support"}:
+            normalized["issue_type"] = "general_help"
+
+        intents = normalized.get("intents")
+        if isinstance(intents, list):
+            mapped: list[str] = []
+            alias_map = {
+                "settings_question": "support_help",
+                "settings": "support_help",
+                "general_question": "support_help",
+                "account_help": "support_help",
+                "security_issue": "security_threat",
+                "report_outage": "service_outage",
+                "request_assistance": "support_help",
+                "request_help": "support_help",
+                "bug": "bug_report",
+                "feature": "feature_request",
+                "billing_question": "billing_dispute",
+            }
+            for intent in intents:
+                key = str(intent).strip().lower()
+                mapped.append(alias_map.get(key, key))
+            normalized["intents"] = mapped
+
+        return normalized
+
     def _parse_llm_response(self, output: str) -> dict[str, Any]:
         try:
-            return json.loads(output)
+            parsed = json.loads(output)
         except json.JSONDecodeError:
             return {"error": "invalid_json"}
-#LOOK UP CUSTOMER HISTORY AND KB ENTRIES, CALL LLM, VALIDATE OUTPUT, FALLBACK IF INVALID OR UNSAFE FROM init.py in tools
+
+        if not isinstance(parsed, dict):
+            return {"error": "response_must_be_json_object"}
+        if parsed.get("type") == "tool_call":
+            name = parsed.get("name")
+            if (
+                set(parsed) != {"type", "name"}
+                or not isinstance(name, str)
+                or name not in {"customer_history", "knowledge_base", "get_customer_history", "search_kb"}
+            ):
+                return {"error": "invalid_tool_call"}
+            aliases = {"get_customer_history": "customer_history", "search_kb": "knowledge_base"}
+            parsed["name"] = aliases.get(parsed["name"], parsed["name"])
+            return parsed
+        if parsed.get("type") == "final":
+            decision = parsed.get("decision")
+            if not isinstance(decision, dict) or set(parsed) != {"type", "decision"}:
+                return {"error": "invalid_final_decision"}
+            return self._normalize_aliases(decision)
+        # Accept the original direct-decision format for injected clients and integrations.
+        return self._normalize_aliases(parsed)
+
     def run(self, ticket_payload: Mapping[str, Any] | str) -> TriageDecision:
+        started = time.perf_counter()
         ticket = normalize_ticket(ticket_payload)
-        history = self.customer_tool.fetch(ticket.customer_id)
-        kb = self.kb_tool.lookup(ticket.product, ticket.issue_type)
-        context = {"customer_history": history.summary, "kb": kb.summary}
+        ticket_data = ticket.model_dump(mode="json", exclude_none=True)
+        context: dict[str, Any] = {
+            "available_tools": ["customer_history", "knowledge_base"],
+            "feedback": [],
+        }
+        used_tools: set[str] = set()
+        tool_calls = 0
+        llm_calls = 0
+        retries = 0
+        decision: dict[str, Any] | None = None
 
-        try:
-            raw = self.llm_client.generate(ticket.model_dump(mode="json", exclude_none=True), context)
-        except Exception:
-            raw = json.dumps(build_safe_fallback(ticket, history.summary, kb.summary))
+        while retries <= self.max_model_retries:
+            context["available_tools"] = [
+                name for name in self.tool_registry.available() if name not in used_tools
+            ]
+            context["force_submit"] = tool_calls >= self.max_tool_calls or not context["available_tools"]
+            try:
+                llm_calls += 1
+                raw = self.llm_client.generate(ticket_data, context)
+            except LLMConfigurationError:
+                raise
+            except (RuntimeError, OSError, TimeoutError, ValueError, TypeError) as exc:
+                safe_msg = redact_pii(str(exc))
+                logger.warning("LLM generation failed for ticket %s: %s", ticket.ticket_id, safe_msg)
+                self._record_event("llm_error", ticket.ticket_id, metadata={"error": safe_msg})
+                context["feedback"] = [f"Model generation failed: {type(exc).__name__}."]
+                break
 
-        decision = self._parse_llm_response(raw)
-        if not isinstance(decision, dict) or "error" in decision:
-            decision = build_safe_fallback(ticket, history.summary, kb.summary)
+            response = self._parse_llm_response(raw)
+            if "error" in response:
+                retries += 1
+                safe_err = redact_pii(str(response["error"]))
+                logger.warning("Model responded with parse error for ticket %s: %s", ticket.ticket_id, safe_err)
+                self._record_event("parse_error", ticket.ticket_id, metadata={"error": safe_err})
+                context["feedback"] = [response["error"]]
+                continue
 
-        schema_issues = self.schema_validator.validate(decision)
-        guardrail_issues = self.policy_guardrail.validate(decision)
+            if response.get("type") == "tool_call":
+                tool_name = response["name"]
+                if tool_name in used_tools or tool_calls >= self.max_tool_calls:
+                    retries += 1
+                    logger.warning("Tool request rejected for %s: already used or over limit", tool_name)
+                    context["feedback"] = [
+                        "Tool request unavailable: each available tool may be called once, up to the tool-call limit."
+                    ]
+                    continue
 
-        if schema_issues or guardrail_issues:
-            decision = build_safe_fallback(ticket, history.summary, kb.summary)
+                used_tools.add(tool_name)
+                tool_calls += 1
+                try:
+                    result = self.tool_registry.execute(ticket_data, tool_name)
+                    if tool_name == "customer_history":
+                        context["customer_history"] = result.summary
+                    else:
+                        context["kb"] = result.summary
+                    if not result.success:
+                        logger.warning("Tool %s failed for ticket %s: %s", tool_name, ticket.ticket_id, result.error)
+                        context["feedback"] = [
+                            f"{tool_name} tool reported failure: {result.error or 'no details provided'}."
+                        ]
+                        retries += 1
+                    else:
+                        context["feedback"] = []
+                except (RuntimeError, ValueError, TypeError, OSError) as exc:
+                    context[tool_name if tool_name == "customer_history" else "kb"] = (
+                        f"{tool_name.replace('_', ' ').title()} lookup unavailable."
+                    )
+                    logger.exception("Tool execution crashed for %s on ticket %s", tool_name, ticket.ticket_id)
+                    context["feedback"] = [f"{tool_name} tool failed: {type(exc).__name__}."]
+                    retries += 1
+                continue
+
+            response["ticket_id"] = ticket.ticket_id
+            response["customer_history_summary"] = str(context.get("customer_history", ""))
+            response["kb_summary"] = str(context.get("kb", ""))
+            schema_issues = self.schema_validator.validate(response)
+            guardrail_issues = (
+                self.policy_guardrail.validate({**response, "description": ticket.description}) if not schema_issues else []
+            )
+            if not schema_issues and not guardrail_issues:
+                decision = response
+                logger.info("Accepted triage decision for ticket %s", ticket.ticket_id)
+                break
+
+            retries += 1
+            logger.warning("Decision rejected for ticket %s: schema=%s guardrails=%s", ticket.ticket_id, schema_issues, guardrail_issues)
+            context["feedback"] = schema_issues + guardrail_issues
+
+        if decision is None:
+            decision = build_safe_fallback(
+                ticket,
+                str(context.get("customer_history", "Customer history was not requested.")),
+                str(context.get("kb", "Knowledge base was not requested.")),
+            )
             schema_issues = self.schema_validator.validate(decision)
-            guardrail_issues = self.policy_guardrail.validate(decision)
+            guardrail_issues = self.policy_guardrail.validate({**decision, "description": ticket.description})
+            logger.warning("Fallback decision used for ticket %s: schema=%s guardrails=%s", ticket.ticket_id, schema_issues, guardrail_issues)
 
         if schema_issues or guardrail_issues:
-            raise ValueError("; ".join(schema_issues + guardrail_issues))
+            logger.warning(
+                "Final fallback for ticket %s still produced issues: schema=%s guardrails=%s; returning safe escalation.",
+                ticket.ticket_id,
+                schema_issues,
+                guardrail_issues,
+            )
+            decision = {
+                **decision,
+                "ticket_id": ticket.ticket_id,
+                "urgency": "critical",
+                "action": "escalate_to_human",
+                "intents": ["support_help"],
+                "confidence": 0.0,
+                "reasoning": "Safety fallback escalated this ticket because the generated fallback did not pass validation.",
+                "customer_history_summary": str(context.get("customer_history", "")),
+                "kb_summary": str(context.get("kb", "")),
+                "safety_checks": ["fallback guardrail applied", "forced human escalation"],
+            }
 
-        return TriageDecision.model_validate(decision)
+        result = TriageDecision.model_validate(decision)
+        usage = getattr(self.llm_client, "last_usage", {})
+        self.last_run_metrics = {
+            "latency_ms": round((time.perf_counter() - started) * 1000, 2),
+            "prompt_tokens": int(usage.get("prompt_tokens", 0)),
+            "completion_tokens": int(usage.get("completion_tokens", 0)),
+            "total_tokens": int(usage.get("total_tokens", 0)),
+            "tool_calls": tool_calls,
+            "llm_calls": llm_calls,
+            "cost_usd": float(usage.get("cost_usd", 0.0)),
+            "projected_daily_cost_usd": round(float(usage.get("cost_usd", 0.0)) * 10000, 6),
+        }
+        return result
 
 
 __all__ = ["TriageAgent", "build_safe_fallback"]

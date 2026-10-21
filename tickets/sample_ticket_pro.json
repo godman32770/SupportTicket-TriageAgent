@@ -1,0 +1,16 @@
+{
+  "ticket_id": "T-103",
+  "customer_id": "C-103",
+  "product": "web_app",
+  "issue_type": "appearance_settings",
+  "description": "Pro customer asks whether dark mode is supported. After being directed to Settings > Appearance, the customer only sees Light and System Default options. Selecting System Default does not activate a dark theme even though their Mac is configured for dark mode. The customer asks whether this is a bug or a configuration issue and also requests a possible feature to schedule automatic dark-mode switching at 6 PM. Customer has been subscribed for five months, logs in daily, and has no previous support tickets.",
+  "language": "en",
+  "sentiment": "neutral",
+  "intents": [
+    "troubleshooting",
+    "possible_bug",
+    "dark_mode_support",
+    "feature_request",
+    "scheduled_theme_switching"
+  ]
+}

@@ -1,5 +1,5 @@
 from __future__ import annotations
 
-from app.tools import CustomerHistoryTool
+from app.tools import KBLookupTool
 
-__all__ = ["CustomerHistoryTool"]
+__all__ = ["KBLookupTool"]

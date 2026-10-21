@@ -1,0 +1,20 @@
+﻿[
+  {
+    "ticket_id": "T-security-1",
+    "customer_id": "C-7",
+    "product": "web",
+    "issue_type": "security",
+    "description": "A security breach exposed my account and I think my data was copied.",
+    "sentiment": "frightened",
+    "language": "en"
+  },
+  {
+    "ticket_id": "T-security-2",
+    "customer_id": "C-8",
+    "product": "legal",
+    "issue_type": "legal",
+    "description": "We have a legal threat and the other party is demanding a response before midnight.",
+    "sentiment": "concerned",
+    "language": "en"
+  }
+]

@@ -6,6 +6,17 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 Urgency = Literal["low", "medium", "high", "critical"]
 Action = Literal["auto_respond", "route_to_specialist", "escalate_to_human"]
+Intent = Literal[
+    "login_help",
+    "billing_dispute",
+    "service_outage",
+    "security_threat",
+    "legal_threat",
+    "bug_report",
+    "feature_request",
+    "support_help",
+    "prompt_injection",
+]
 
 #DATA STRUCTURE FOR SUPPORT TICKET AND TRIAGE DECISION, WITH VALIDATION AND FALLBACK LOGIC
 class SupportTicket(BaseModel):
@@ -36,7 +47,7 @@ class TriageDecision(BaseModel):
     issue_type: str
     sentiment: str
     language: str
-    intents: list[str]
+    intents: list[Intent]
     action: Action
     confidence: float = Field(ge=0.0, le=1.0)
     reasoning: str
@@ -56,7 +67,24 @@ TRIAGE_SCHEMA: dict[str, Any] = {
         "issue_type": {"type": "string", "minLength": 1},
         "sentiment": {"type": "string", "minLength": 1},
         "language": {"type": "string", "minLength": 1},
-        "intents": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+        "intents": {
+            "type": "array",
+            "items": {
+                "type": "string",
+                "enum": [
+                    "login_help",
+                    "billing_dispute",
+                    "service_outage",
+                    "security_threat",
+                    "legal_threat",
+                    "bug_report",
+                    "feature_request",
+                    "support_help",
+                    "prompt_injection",
+                ],
+            },
+            "minItems": 1,
+        },
         "action": {"type": "string", "enum": ["auto_respond", "route_to_specialist", "escalate_to_human"]},
         "confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0},
         "reasoning": {"type": "string", "minLength": 10},

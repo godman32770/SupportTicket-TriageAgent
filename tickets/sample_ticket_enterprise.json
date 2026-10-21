@@ -1,0 +1,15 @@
+{
+  "ticket_id": "T-102",
+  "customer_id": "C-102",
+  "product": "enterprise_platform",
+  "issue_type": "service_outage",
+  "description": "Enterprise customer in Thailand with 45 seats reports that the system is inaccessible and returns HTTP 500 errors. The issue persists across Chrome, Safari, and Firefox on multiple machines, and coworkers are affected. Customers are complaining, and a major client demo is scheduled for this afternoon; the customer warns that the deal may be lost if service does not recover. The public status page reports all systems operational, but the customer suspects a possible Asia-region issue. Customer has been subscribed for eight months and this is their first critical issue.",
+  "language": "th",
+  "sentiment": "frustrated",
+  "intents": [
+    "service_outage",
+    "enterprise_escalation",
+    "regional_incident_check",
+    "urgent_human_support"
+  ]
+}

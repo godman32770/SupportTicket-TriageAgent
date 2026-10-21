@@ -1,0 +1,20 @@
+﻿[
+  {
+    "ticket_id": "T-login-1",
+    "customer_id": "C-1",
+    "product": "mobile_app",
+    "issue_type": "login",
+    "description": "I forgot my password and the reset email never arrives.",
+    "sentiment": "neutral",
+    "language": "en"
+  },
+  {
+    "ticket_id": "T-login-2",
+    "customer_id": "C-2",
+    "product": "mobile_app",
+    "issue_type": "login",
+    "description": "I am locked out and cannot access my account. This is urgent.",
+    "sentiment": "frustrated",
+    "language": "en"
+  }
+]

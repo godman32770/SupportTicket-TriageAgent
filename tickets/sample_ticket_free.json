@@ -1,0 +1,16 @@
+{
+  "ticket_id": "T-101",
+  "customer_id": "C-101",
+  "product": "billing",
+  "issue_type": "duplicate_charges",
+  "description": "Customer attempted to upgrade from Free to Pro but did not receive Pro access. After retrying with a different card, the customer reports three pending or posted charges of $29.99 each, with no refunds received. The customer is increasingly frustrated, needs Pro export features for a presentation in two hours, and threatens to dispute all charges with their bank if they are not reversed by end of day. Customer has been on the Free plan for four months and is contacting support for the first time.",
+  "language": "en",
+  "sentiment": "angry",
+  "intents": [
+    "billing_dispute",
+    "duplicate_charges",
+    "upgrade_failure",
+    "restore_pro_access",
+    "urgent_human_support"
+  ]
+}

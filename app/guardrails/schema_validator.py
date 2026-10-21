@@ -15,4 +15,4 @@ class SchemaValidator:
             return [f"schema error: {exc.message}"]
 
 
-__all__ = ["SchemaValidator", "TRIAGE_SCHEMA"]
+__all__ = ["TRIAGE_SCHEMA", "SchemaValidator"]

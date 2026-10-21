@@ -1,0 +1,20 @@
+﻿[
+  {
+    "ticket_id": "T-billing-1",
+    "customer_id": "C-3",
+    "product": "billing",
+    "issue_type": "billing",
+    "description": "I was charged twice for the same invoice and I need this fixed urgently.",
+    "sentiment": "frustrated",
+    "language": "en"
+  },
+  {
+    "ticket_id": "T-billing-2",
+    "customer_id": "C-4",
+    "product": "billing",
+    "issue_type": "billing",
+    "description": "Please refund my mistaken charge right away and confirm the payment timeline.",
+    "sentiment": "angry",
+    "language": "en"
+  }
+]

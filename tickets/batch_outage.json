@@ -1,0 +1,20 @@
+﻿[
+  {
+    "ticket_id": "T-outage-1",
+    "customer_id": "C-5",
+    "product": "enterprise",
+    "issue_type": "outage",
+    "description": "Our enterprise dashboard is down and customer traffic is failing across all regions.",
+    "sentiment": "angry",
+    "language": "en"
+  },
+  {
+    "ticket_id": "T-outage-2",
+    "customer_id": "C-6",
+    "product": "enterprise",
+    "issue_type": "services",
+    "description": "Our API is down across all customer tenants and the platform has stopped processing orders.",
+    "sentiment": "angry",
+    "language": "en"
+  }
+]
