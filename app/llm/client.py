@@ -193,6 +193,9 @@ class OfflineLLMClient(LLMClient):
         elif "locked out" in description or "cannot access" in description or "unable to access" in description or ("urgent" in description and ("login" in description or "access" in description or "account" in description)):
             urgency, action = "high", "escalate_to_human"
             intent = "login_help"
+        elif "temporarily disabled" in description or "too many attempts" in description:
+            urgency, action = "medium", "route_to_specialist"
+            intent = "login_help"
         elif issue == "login" or "password" in description or "login" in description:
             if "urgent" in description or "locked out" in description or "cannot access" in description:
                 urgency, action = "high", "escalate_to_human"

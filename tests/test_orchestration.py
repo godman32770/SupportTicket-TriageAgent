@@ -101,6 +101,41 @@ def test_ticket_metadata_is_owned_by_application():
     assert result.sentiment == "frustrated"
 
 
+def test_content_calibration_escalates_suspected_breach():
+    decision = _decision()
+    decision.update({"urgency": "high", "action": "route_to_specialist"})
+    client = SequenceClient([{"type": "final", "decision": decision}])
+
+    result = TriageAgent(llm_client=client).run({
+        "ticket_id": "T-61",
+        "customer_id": "C-61",
+        "product": "storage",
+        "issue_type": "security",
+        "description": "We lost customer data and suspect a breach in the backup system.",
+    })
+
+    assert result.urgency == "critical"
+    assert result.action == "escalate_to_human"
+    assert result.intents == ["security_threat"]
+
+
+def test_contained_outage_is_high_not_critical():
+    decision = _decision()
+    decision.update({"urgency": "critical", "action": "escalate_to_human"})
+    client = SequenceClient([{"type": "final", "decision": decision}])
+
+    result = TriageAgent(llm_client=client).run({
+        "ticket_id": "T-62",
+        "customer_id": "C-62",
+        "product": "web_app",
+        "issue_type": "general_help",
+        "description": "The service is intermittently down and our internal team cannot work.",
+    })
+
+    assert result.urgency == "high"
+    assert result.action == "escalate_to_human"
+
+
 def test_orchestrator_retries_invalid_decision_with_validation_feedback():
     invalid = _decision()
     invalid["urgency"] = "urgent"

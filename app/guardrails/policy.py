@@ -131,21 +131,56 @@ class PolicyGuardrail:
             ],
         ) and action != "escalate_to_human":
             issues.append("account access failures require human escalation (account_access_escalate)")
+        billing_signal_text = " ".join(filter(None, [ticket_text, issue_type, history]))
         if action == "auto_respond" and (
-            self._contains_any(issue_type, ["billing", "chargeback", "dispute"])
-            or self._contains_any(history, ["chargeback", "dispute", "unresolved payment", "unresolved payments", "unresolved"])
-            or self._contains_any(signal_text, ["chargeback", "billing dispute", "unresolved payment", "multiple unpaid invoices"])
+            self._contains_any(issue_type, ["chargeback", "dispute", "duplicate_charges"])
+            or self._contains_any(history, ["chargeback", "dispute", "unresolved payment", "unresolved payments"])
+            or self._contains_any(billing_signal_text, ["chargeback", "billing dispute", "unresolved payment", "multiple unpaid invoices", "duplicate charge", "refund"])
         ):
             issues.append("billing dispute or unresolved payments must not be auto-responded (billing_no_auto)")
 
         if (
             self._contains_any(product, ["enterprise"])
-            and self._contains_any(signal_text, ["outage", "down", "service unavailable", "system outage"])
+            and self._contains_any(
+                signal_text,
+                [
+                    "across all regions",
+                    "across every region",
+                    "all customer tenants",
+                    "customer traffic is failing",
+                    "system-wide outage",
+                    "platform is still unavailable",
+                    "coworkers are affected",
+                    "multiple machines",
+                    "major client demo",
+                ],
+            )
+            and (action != "escalate_to_human" or urgency != "critical")
+        ) or (
+            self._contains_any(product, ["enterprise"])
+            and self._contains_any(issue_type, ["outage"])
+            and not ticket_text
             and (action != "escalate_to_human" or urgency != "critical")
         ):
             issues.append("enterprise outage must be escalated and marked critical (enterprise_outage_escalate)")
 
-        if self._contains_any(signal_text, ["security", "breach", "data loss", "legal", "lawsuit", "threat"]):
+        security_signal = self._contains_any(
+            signal_text,
+            [
+                "security breach",
+                "data breach",
+                "suspect a breach",
+                "breach in",
+                "data loss",
+                "customer data",
+                "unauthorized access",
+                "account takeover",
+                "legal threat",
+                "lawsuit",
+                "legal demand",
+            ],
+        ) or issue_type.lower() in {"security", "legal", "security_threat", "legal_threat"}
+        if security_signal:
             if action == "auto_respond":
                 issues.append("security or legal threats must not be auto-responded (sec_escalate / legal_threat_escalate)")
             if urgency in {"low", "medium"} and action != "escalate_to_human":

@@ -80,6 +80,8 @@ class KBLookupTool:
             "login": ["Password reset flows are available; if MFA issues persist, escalate to specialist."],
             "mobile_app": ["Clear app cache and reinstall if the app crashes after update."],
             "account": ["Account lockouts can be solved by verification and a guided reset workflow."],
+            "general_help": ["General support guidance covers account settings, notification preferences, MFA settings, billing contacts, and renewal information."],
+            "feature_request": ["Feature and language-setting requests can be answered with the current product settings and availability guidance."],
             "service_outage": ["For service outages, verify status and route affected enterprise customers to incident support."],
             "appearance_settings": ["Dark mode availability depends on the product release; route configuration issues and feature requests to a specialist."],
         }

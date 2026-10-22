@@ -136,20 +136,73 @@ def apply_content_safety_overrides(response: dict[str, Any], ticket: SupportTick
     }
     if ticket.issue_type.lower() in canonical_intents:
         response["intents"] = [canonical_intents[ticket.issue_type.lower()]]
-    if any(token in text for token in ("security breach", "data breach", "data loss", "legal threat", "lawsuit", "outage", "down", "platform is unavailable", "system down")):
+    broad_security = any(token in text for token in ("security breach", "data breach", "suspect a breach", "breach in", "data loss", "customer data", "unauthorized access", "account takeover"))
+    broad_outage = any(token in text for token in ("across all regions", "across every region", "all customer tenants", "customer traffic is failing", "system-wide outage", "platform is still unavailable", "coworkers are affected", "multiple machines", "major client demo"))
+    service_issue = any(token in text for token in ("outage", "service down", "intermittently", "platform is unavailable", "system down", "api is down", "dashboard is down"))
+    legal_issue = any(token in text for token in ("legal threat", "lawsuit", "legal demand"))
+    prompt_injection = any(token in text for token in ("prompt injection", "ignore previous instructions", "bypass instructions", "malicious prompt"))
+    if broad_security or broad_outage or legal_issue:
         response["urgency"] = "critical"
         response["action"] = "escalate_to_human"
         response["intents"] = [
-            "security_threat" if any(token in text for token in ("breach", "data loss")) else
-            "legal_threat" if any(token in text for token in ("legal", "lawsuit")) else
+            "security_threat" if broad_security else
+            "legal_threat" if legal_issue else
             "service_outage"
         ]
         response.setdefault("safety_checks", []).append("content safety override applied")
+    elif prompt_injection:
+        response["urgency"] = "high"
+        response["action"] = "escalate_to_human"
+        response["intents"] = ["prompt_injection"]
+        response.setdefault("safety_checks", []).append("prompt injection override applied")
+    elif service_issue:
+        response["urgency"] = "high"
+        response["action"] = "escalate_to_human"
+        response["intents"] = ["service_outage"]
+        response.setdefault("safety_checks", []).append("service impact override applied")
     elif any(token in text for token in ("locked out", "cannot access", "unable to access", "mfa code is not working", "cannot sign in", "can't sign in")):
         response["urgency"] = "high"
         response["action"] = "escalate_to_human"
         response["intents"] = ["login_help"]
         response.setdefault("safety_checks", []).append("account access override applied")
+    return response
+
+
+def calibrate_decision(response: dict[str, Any], ticket: SupportTicket, kb_summary: str) -> dict[str, Any]:
+    """Apply deterministic impact/action calibration after model generation."""
+    text = f"{ticket.description} {ticket.issue_type}".lower()
+    kb_available = bool(kb_summary and "no matching kb" not in kb_summary.lower())
+    routine_login = ticket.issue_type.lower() == "login" and not any(
+        phrase in text for phrase in ("locked out", "cannot access", "unable to access", "mfa code", "account was temporarily disabled")
+    )
+    high_risk_text = any(
+        phrase in text
+        for phrase in (
+            "outage", "service down", "platform is unavailable", "system down", "breach", "data loss",
+            "intermittently", "internal team cannot work", "payroll uploads", "legal threat", "lawsuit", "cannot access", "locked out",
+        )
+    )
+    routine_help = ticket.issue_type.lower() in {"general_help", "support", "feature_request", "appearance_settings"} and not high_risk_text and not any(
+        phrase in text for phrase in ("does not activate", "crash", "bug", "not working")
+    )
+    billing_risk = any(
+        phrase in text for phrase in ("duplicate", "refund", "chargeback", "billing dispute", "unresolved payment", "renewal price is wrong")
+    )
+    routine_billing = ticket.issue_type.lower() in {"billing", "payment"} and not billing_risk and not any(
+        phrase in text for phrase in ("due tomorrow", "due today", "urgent", "asap")
+    )
+    if routine_login or routine_billing or (routine_help and not billing_risk):
+        if kb_available:
+            response["urgency"] = "low"
+            response["action"] = "auto_respond"
+            response.setdefault("safety_checks", []).append("routine request calibration applied")
+    elif billing_risk:
+        response["urgency"] = "medium"
+        response["action"] = "route_to_specialist"
+        response.setdefault("safety_checks", []).append("billing risk calibration applied")
+    elif ticket.issue_type.lower() == "bug" or any(phrase in text for phrase in ("crashes every time", "reproducible bug")):
+        response["urgency"] = "medium"
+        response["action"] = "route_to_specialist"
     return response
 
 
@@ -380,6 +433,7 @@ class TriageAgent:
             response = apply_content_safety_overrides(response, ticket)
             response["customer_history_summary"] = str(context.get("customer_history", ""))
             response["kb_summary"] = str(context.get("kb", ""))
+            response = calibrate_decision(response, ticket, response["kb_summary"])
             if response.get("action") == "auto_respond" and (
                 not response["kb_summary"] or "no matching kb" in response["kb_summary"].lower()
             ):

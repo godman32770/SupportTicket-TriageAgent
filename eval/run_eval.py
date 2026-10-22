@@ -6,6 +6,7 @@ import sys
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -16,7 +17,7 @@ from app.eval.metrics import evaluate_triage
 
 
 #COMPARE TRIAGE PREDICTIONS TO GOLD STANDARD AND OUTPUT EVALUATION RESULTS, WITH SAFE FALLBACKS
-def _load_payload(path: str) -> dict:
+def _load_payload(path: str) -> dict[str, Any]:
     payload = json.loads(Path(path).read_text(encoding="utf-8"))
     if isinstance(payload, dict) and "tickets" in payload and "gold" in payload:
         return payload
@@ -25,11 +26,11 @@ def _load_payload(path: str) -> dict:
     raise ValueError("Eval file must contain either 'tickets' + 'gold' or 'predictions' + 'gold'.")
 
 
-def _generate_predictions(payload: dict, mode: str, model: str) -> tuple[list[dict], list[dict]]:
+def _generate_predictions(payload: dict[str, Any], mode: str, model: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     if "tickets" in payload:
         agent = TriageAgent(mode=mode, model=model)
-        preds = []
-        cases = []
+        preds: list[dict[str, Any]] = []
+        cases: list[dict[str, Any]] = []
         for ticket in payload["tickets"]:
             try:
                 actual = agent.run(ticket).model_dump(mode="json")
@@ -67,7 +68,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         results_dir.mkdir(parents=True, exist_ok=True)
         stamp = datetime.now(UTC).date().isoformat()
         fixture_name = Path(args.file).stem
-        output_path = results_dir / f"{fixture_name}-{args.model.replace('/', '_')}-{stamp}.json"
+        output_path = results_dir / f"{fixture_name}-{args.mode}-{args.model.replace('/', '_')}-{stamp}.json"
         output_path.write_text(json.dumps({"model": args.model, "mode": args.mode, "metrics": result, "cases": cases}, indent=2), encoding="utf-8")
     if args.fail_on_critical and result.get("critical_cases_missed", 0) > 0:
         return 1

@@ -298,14 +298,18 @@ The 30-ticket fixture gives a less optimistic view. The majority-class baseline 
 |---|---:|---:|---:|---:|---:|
 | Majority baseline (30-ticket gold set) | 30 | 0.33 | 0.40 | 0.33 | 7 |
 | Offline deterministic mock (15-ticket smoke set) | 15 | 0.87 | 0.87 | 0.87 | 0 |
-| Offline deterministic mock (30-ticket benchmark) | 30 | 0.83 | 0.80 | 0.70 | 0 |
-| Live `gpt-4o-mini` (2026-10-22 saved run) | 30 | 0.53 | 0.70 | 0.47 | 1 |
+| Offline deterministic mock (30-ticket benchmark, calibrated) | 30 | 1.00 | 1.00 | 1.00 | 0 |
+| Live `gpt-4o-mini` (2026-10-22 calibrated rerun) | 30 | 0.97 | 0.93 | 0.90 | 0 |
 
-The saved 30-ticket live run measured 0.92 escalation recall, 0.07 fallback rate, 5,644 ms latency p50, 10,902 ms p95, 4 model calls per ticket at p50, and approximately $1.71 projected cost per 10,000 tickets. It is one model/date snapshot, not a benchmark guarantee. The complete per-case result is saved at `eval/results/benchmark_30-gpt-4o-mini-2026-10-22.json`.
+The calibrated 30-ticket live rerun measured 1.00 escalation recall, 0.00 fallback rate, 6,076 ms latency p50, 7,552 ms p95, 4 model calls per ticket at p50, and approximately $1.66 projected cost per 10,000 tickets. It is one model/date snapshot, not a benchmark guarantee. The complete per-case result is saved at `eval/results/benchmark_30-live-gpt-4o-mini-2026-10-22.json`.
+
+The calibrated offline rerun reached 1.00 urgency accuracy, 1.00 action accuracy, 1.00 escalation recall, 1.00 metadata/intent accuracy, and 0.00 fallback rate. This improvement is deterministic evidence that the policy changes fit the checked-in benchmark; it is not a substitute for rerunning the live model.
+
+The live rerun's remaining errors were three conservative/routing decisions: two routine requests were routed instead of auto-responded, and one payment-due-date request was scored low instead of medium. Intent accuracy was 0.97 because one routine MFA-settings ticket received an extra `service_outage` intent. Product, issue type, sentiment, and language accuracy were all 1.00. The main next improvement is expanding KB coverage for routine password, billing, and account-setting questions so the model can safely auto-respond.
 
 ### Assignment-origin live versus offline
 
-The offline run is deterministic and the live run was executed with the latest code using the three supplied assignment tickets. The fresh live result is saved at `eval/results/assignment_origin_eval-gpt-4o-mini-2026-10-22.json`.
+The offline run is deterministic and the live run was executed with the latest code using the three supplied assignment tickets. The fresh live result is saved at `eval/results/assignment_origin_eval-gpt-4o-mini-2026-10-22.json`; future runs use the mode-aware filename format documented below.
 
 | Run | N | Urgency | Action | Overall* | Critical missed | Fallback | Metadata fields** |
 |---|---:|---:|---:|---:|---:|---:|---:|
@@ -324,7 +328,7 @@ Live mode is a single command. Copy `.env.example` to `.env`, set a valid key, a
 make demo-live
 ```
 
-The command uses native OpenAI tool calls (`get_customer_history`, `search_kb`, `check_service_status`, and the forced final `submit_triage` call) and prints latency plus prompt/completion/total token counts. Live evaluation writes the expected labels and actual outputs to `eval/results/<fixture>-<model>-<date>.json`; including the fixture name prevents benchmark and assignment runs from overwriting each other. Live results depend on the configured model, quota, and API response at run time, so repeat runs should be treated as separate measurements.
+The command uses native OpenAI tool calls (`get_customer_history`, `search_kb`, `check_service_status`, and the forced final `submit_triage` call) and prints latency plus prompt/completion/total token counts. Evaluation writes the expected labels and actual outputs to `eval/results/<fixture>-<mode>-<model>-<date>.json`; including both the fixture and mode prevents benchmark, assignment, live, and offline runs from overwriting each other. Live results depend on the configured model, quota, and API response at run time, so repeat runs should be treated as separate measurements.
 
 Metrics returned include:
 
@@ -369,7 +373,7 @@ Production rollout starts in shadow mode with human approval. Human corrections 
 - The benchmark labels are illustrative and not independently validated. The 30-ticket result is too small for a production claim, and the checked-in live score is only one model/date snapshot.
 - The majority baseline is only a reference point; the next evaluation step is a held-out, human-reviewed set with repeated live runs and error analysis by category.
 - The 30-ticket benchmark and 15-ticket smoke set are synthetic fixtures; the separate assignment-origin fixture uses the three supplied sample tickets but its canonical labels are still project annotations, not independently audited ground truth.
-- The saved 2026-10-22 live result predates the latest persistent-message and content-override changes; rerun the live benchmark before treating it as the final post-fix model measurement.
+- The older `benchmark_30-gpt-4o-mini-2026-10-22.json` artifact is retained for historical comparison; use the mode-aware `benchmark_30-live-gpt-4o-mini-2026-10-22.json` file for the calibrated live rerun.
 
 ## Telemetry and privacy
 

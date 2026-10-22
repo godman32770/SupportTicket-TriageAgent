@@ -1,0 +1,247 @@
+{
+  "model": "gpt-4o-mini",
+  "mode": "offline",
+  "metrics": {
+    "urgency_accuracy": 0.3333333333333333,
+    "action_accuracy": 0.6666666666666666,
+    "overall_accuracy": 0.3333333333333333,
+    "fallback_rate": 0.0,
+    "kb_grounding_rate": 1.0,
+    "auto_respond_precision": 0.0,
+    "auto_respond_recall": 0.0,
+    "route_to_specialist_precision": 1.0,
+    "route_to_specialist_recall": 0.5,
+    "escalate_to_human_precision": 1.0,
+    "escalate_to_human_recall": 1.0,
+    "escalation_recall": 1.0,
+    "urgency_confusion_matrix": {
+      "low": {
+        "low": 0,
+        "medium": 0,
+        "high": 0,
+        "critical": 0
+      },
+      "medium": {
+        "low": 1,
+        "medium": 1,
+        "high": 0,
+        "critical": 0
+      },
+      "high": {
+        "low": 0,
+        "medium": 0,
+        "high": 0,
+        "critical": 0
+      },
+      "critical": {
+        "low": 0,
+        "medium": 0,
+        "high": 1,
+        "critical": 0
+      }
+    },
+    "critical_cases_missed": 0.0,
+    "product_accuracy": 1.0,
+    "issue_type_accuracy": 1.0,
+    "sentiment_accuracy": 1.0,
+    "language_accuracy": 1.0,
+    "intents_accuracy": 1.0,
+    "kb_hit_rate": 0.6666666666666666,
+    "safety_policy_pass_rate": 0.6666666666666666,
+    "latency_p50_ms": 7.53,
+    "latency_p95_ms": 8.68,
+    "latency_sample_count": 3.0,
+    "cost_usd_p50": 0.0,
+    "cost_usd_p95": 0.0,
+    "cost_usd_sample_count": 3.0,
+    "llm_calls_p50": 3.0,
+    "llm_calls_p95": 4.0,
+    "llm_calls_sample_count": 3.0,
+    "projected_daily_cost_usd_p50": 0.0
+  },
+  "cases": [
+    {
+      "ticket": {
+        "ticket_id": "T-102",
+        "customer_id": "C-102",
+        "product": "enterprise_platform",
+        "issue_type": "service_outage",
+        "description": "Enterprise customer in Thailand with 45 seats reports that the system is inaccessible and returns HTTP 500 errors. The issue persists across Chrome, Safari, and Firefox on multiple machines, and coworkers are affected. Customers are complaining, and a major client demo is scheduled for this afternoon; the customer warns that the deal may be lost if service does not recover. The public status page reports all systems operational, but the customer suspects a possible Asia-region issue. Customer has been subscribed for eight months and this is their first critical issue.",
+        "language": "th",
+        "intents": [
+          "service_outage",
+          "enterprise_escalation",
+          "regional_incident_check",
+          "urgent_human_support"
+        ]
+      },
+      "expected": {
+        "ticket_id": "T-102",
+        "urgency": "critical",
+        "action": "escalate_to_human",
+        "product": "enterprise_platform",
+        "issue_type": "service_outage",
+        "sentiment": "neutral",
+        "language": "th",
+        "intents": [
+          "service_outage"
+        ],
+        "kb_keywords": []
+      },
+      "actual": {
+        "ticket_id": "T-102",
+        "urgency": "high",
+        "product": "enterprise_platform",
+        "issue_type": "service_outage",
+        "sentiment": "neutral",
+        "language": "th",
+        "intents": [
+          "service_outage"
+        ],
+        "action": "escalate_to_human",
+        "confidence": 0.9,
+        "reasoning": "Offline triage selected a safe classification using rule-based severity heuristics and the supplied history/KB context.",
+        "customer_history_summary": "No prior customer history found for C-102.",
+        "kb_summary": "For service outages, verify status and route affected enterprise customers to incident support.",
+        "safety_checks": [
+          "urgency in allowed set",
+          "action matches policy",
+          "service impact override applied"
+        ],
+        "latency_ms": 8.68,
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0,
+        "tool_calls": 3,
+        "llm_calls": 4,
+        "cost_usd": 0.0,
+        "projected_daily_cost_usd": 0.0
+      }
+    },
+    {
+      "ticket": {
+        "ticket_id": "T-101",
+        "customer_id": "C-101",
+        "product": "billing",
+        "issue_type": "duplicate_charges",
+        "description": "Customer attempted to upgrade from Free to Pro but did not receive Pro access. After retrying with a different card, the customer reports three pending or posted charges of $29.99 each, with no refunds received. The customer is increasingly frustrated, needs Pro export features for a presentation in two hours, and threatens to dispute all charges with their bank if they are not reversed by end of day. Customer has been on the Free plan for four months and is contacting support for the first time.",
+        "language": "en",
+        "sentiment": "angry",
+        "intents": [
+          "billing_dispute",
+          "duplicate_charges",
+          "upgrade_failure",
+          "restore_pro_access",
+          "urgent_human_support"
+        ]
+      },
+      "expected": {
+        "ticket_id": "T-101",
+        "urgency": "medium",
+        "action": "route_to_specialist",
+        "product": "billing",
+        "issue_type": "duplicate_charges",
+        "sentiment": "angry",
+        "language": "en",
+        "intents": [
+          "billing_dispute"
+        ],
+        "kb_keywords": [
+          "charges",
+          "refund"
+        ]
+      },
+      "actual": {
+        "ticket_id": "T-101",
+        "urgency": "medium",
+        "product": "billing",
+        "issue_type": "duplicate_charges",
+        "sentiment": "angry",
+        "language": "en",
+        "intents": [
+          "billing_dispute"
+        ],
+        "action": "route_to_specialist",
+        "confidence": 0.9,
+        "reasoning": "Offline triage selected a safe classification using rule-based severity heuristics and the supplied history/KB context.",
+        "customer_history_summary": "No prior customer history found for C-101.",
+        "kb_summary": "Duplicate charges require payment verification and specialist review before any refund is promised.",
+        "safety_checks": [
+          "urgency in allowed set",
+          "action matches policy",
+          "billing risk calibration applied"
+        ],
+        "latency_ms": 7.47,
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0,
+        "tool_calls": 2,
+        "llm_calls": 3,
+        "cost_usd": 0.0,
+        "projected_daily_cost_usd": 0.0
+      }
+    },
+    {
+      "ticket": {
+        "ticket_id": "T-103",
+        "customer_id": "C-103",
+        "product": "web_app",
+        "issue_type": "appearance_settings",
+        "description": "Pro customer asks whether dark mode is supported. After being directed to Settings > Appearance, the customer only sees Light and System Default options. Selecting System Default does not activate a dark theme even though their Mac is configured for dark mode. The customer asks whether this is a bug or a configuration issue and also requests a possible feature to schedule automatic dark-mode switching at 6 PM. Customer has been subscribed for five months, logs in daily, and has no previous support tickets.",
+        "language": "en",
+        "sentiment": "neutral",
+        "intents": [
+          "troubleshooting",
+          "possible_bug",
+          "dark_mode_support",
+          "feature_request",
+          "scheduled_theme_switching"
+        ]
+      },
+      "expected": {
+        "ticket_id": "T-103",
+        "urgency": "medium",
+        "action": "route_to_specialist",
+        "product": "web_app",
+        "issue_type": "appearance_settings",
+        "sentiment": "neutral",
+        "language": "en",
+        "intents": [
+          "feature_request"
+        ],
+        "kb_keywords": [
+          "dark mode"
+        ]
+      },
+      "actual": {
+        "ticket_id": "T-103",
+        "urgency": "low",
+        "product": "web_app",
+        "issue_type": "appearance_settings",
+        "sentiment": "neutral",
+        "language": "en",
+        "intents": [
+          "feature_request"
+        ],
+        "action": "auto_respond",
+        "confidence": 0.9,
+        "reasoning": "Offline triage selected a safe classification using rule-based severity heuristics and the supplied history/KB context.",
+        "customer_history_summary": "No prior customer history found for C-103.",
+        "kb_summary": "Dark mode availability depends on the product release; route configuration issues and feature requests to a specialist.",
+        "safety_checks": [
+          "urgency in allowed set",
+          "action matches policy",
+          "routine request calibration applied"
+        ],
+        "latency_ms": 7.53,
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0,
+        "tool_calls": 2,
+        "llm_calls": 3,
+        "cost_usd": 0.0,
+        "projected_daily_cost_usd": 0.0
+      }
+    }
+  ]
+}
