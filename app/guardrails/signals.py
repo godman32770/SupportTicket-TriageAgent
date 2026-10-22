@@ -121,8 +121,8 @@ def detect_specialist_signals(text: str) -> set[str]:
         signals.add("sso_configuration")
     if any(phrase in normalized for phrase in ("audit logs", "retention controls", "compliance reporting")):
         signals.add("compliance_question")
-    if any(phrase in normalized for phrase in ("takes over", "slow to load", "load", "time out", "timeout", "times out", "40 seconds")) and any(
-        phrase in normalized for phrase in ("dashboard", "reports", "performance", "slow", "load")
+    if any(phrase in normalized for phrase in ("takes over", "slow to load", "loading", "time out", "timeout", "times out", "40 seconds")) and any(
+        phrase in normalized for phrase in ("dashboard", "reports", "performance", "slow to load", "loading")
     ):
         signals.add("performance_degradation")
     return signals
