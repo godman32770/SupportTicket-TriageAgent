@@ -122,12 +122,11 @@ class PolicyGuardrail:
         if self._contains_any(
             signal_text,
             [
-                "locked out",
-                "cannot access",
-                "unable to access",
-                "mfa code is not working",
-                "cannot sign in",
-                "can't sign in",
+                "locked out", "cannot access", "unable to access", "mfa code is not working",
+                "cannot sign in", "can't sign in", "unable to sign in",
+                "cannot log in", "can't log in", "unable to log in",
+                "cannot login", "can't login", "unable to login",
+                "cannot log into", "can't log into", "unable to log into",
             ],
         ) and action != "escalate_to_human":
             issues.append("account access failures require human escalation (account_access_escalate)")
