@@ -4,6 +4,8 @@ import re
 from collections.abc import Mapping
 from typing import Any, ClassVar
 
+from app.guardrails.signals import detect_escalation_signals, detect_specialist_signals
+
 
 class PolicyGuardrail:
     VALID_URGENCY: ClassVar[set[str]] = {"low", "medium", "high", "critical"}
@@ -102,6 +104,16 @@ class PolicyGuardrail:
                 ],
             )
         )
+
+        escalation_signals = detect_escalation_signals(signal_text)
+        specialist_signals = detect_specialist_signals(signal_text)
+        if escalation_signals and (action != "escalate_to_human" or urgency != "critical"):
+            issues.append(
+                "privacy, GDPR, cross-tenant, or production API failure signals require critical human escalation "
+                f"({', '.join(sorted(escalation_signals))}_escalate)"
+            )
+        if specialist_signals and action == "auto_respond":
+            issues.append("integration, accessibility, SSO, compliance, or performance issues require specialist routing (specialist_signal_no_auto)")
 
         if urgency not in self.VALID_URGENCY:
             issues.append("urgency must be one of low, medium, high, critical.")
