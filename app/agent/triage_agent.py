@@ -9,6 +9,7 @@ from typing import Any
 
 from app.guardrails.policy import PolicyGuardrail
 from app.guardrails.schema_validator import SchemaValidator
+from app.guardrails.signals import detect_escalation_signals, detect_specialist_signals
 from app.llm.client import LLMClient, LLMConfigurationError, OfflineLLMClient, OpenAIChatClient
 from app.models import normalize_ticket
 from app.models.triage import SupportTicket, TriageDecision
@@ -81,9 +82,10 @@ def build_safe_fallback(ticket: SupportTicket, history: str, kb: str) -> dict[st
     text = f"{description} {ticket.issue_type or ''}".lower()
 
     _CRITICAL_PATTERN = re.compile(r"\b(security|breach(?:es)?|data loss|outages?|down|legal|urgent)\b")
+    escalation_signals = detect_escalation_signals(text)
 
     # inside build_safe_fallback, replacing the critical_tokens lines:
-    urgency = "critical" if _CRITICAL_PATTERN.search(text) else "high"
+    urgency = "critical" if _CRITICAL_PATTERN.search(text) or escalation_signals else "high"
     action = "escalate_to_human"
 
     intent_map = {
@@ -100,6 +102,12 @@ def build_safe_fallback(ticket: SupportTicket, history: str, kb: str) -> dict[st
     }
     issue_key = (ticket.issue_type or "general_help").strip().lower()
     fallback_intent = intent_map.get(issue_key, "support_help")
+    if "gdpr" in escalation_signals:
+        fallback_intent = "legal_threat"
+    elif {"privacy", "cross_tenant"} & escalation_signals:
+        fallback_intent = "security_threat"
+    elif "production_api_failure" in escalation_signals:
+        fallback_intent = "service_outage"
 
     return {
         "ticket_id": ticket.ticket_id,
@@ -121,6 +129,8 @@ def build_safe_fallback(ticket: SupportTicket, history: str, kb: str) -> dict[st
 def apply_content_safety_overrides(response: dict[str, Any], ticket: SupportTicket) -> dict[str, Any]:
     """Apply deterministic high-risk routing before accepting model output."""
     text = f"{ticket.description} {ticket.issue_type or ''}".lower()
+    escalation_signals = detect_escalation_signals(text)
+    specialist_signals = detect_specialist_signals(text)
     response["product"] = ticket.product
     response["issue_type"] = ticket.issue_type
     response["sentiment"] = ticket.sentiment
@@ -144,7 +154,21 @@ def apply_content_safety_overrides(response: dict[str, Any], ticket: SupportTick
     service_issue = any(token in text for token in ("outage", "service down", "intermittently", "platform is unavailable", "system down", "api is down", "dashboard is down"))
     legal_issue = any(token in text for token in ("legal threat", "lawsuit", "legal demand"))
     prompt_injection = any(token in text for token in ("prompt injection", "ignore previous instructions", "bypass instructions", "malicious prompt"))
-    if broad_security or broad_outage or legal_issue:
+    if escalation_signals:
+        response["urgency"] = "critical"
+        response["action"] = "escalate_to_human"
+        response["intents"] = ["login_help" if "organization_wide_lockout" in escalation_signals else "legal_threat" if "gdpr" in escalation_signals else "security_threat" if {"privacy", "cross_tenant"} & escalation_signals else "service_outage"]
+        response.setdefault("safety_checks", []).append(
+            "sensitive text escalation override applied: " + ", ".join(sorted(escalation_signals))
+        )
+    elif specialist_signals:
+        response["urgency"] = "medium"
+        response["action"] = "route_to_specialist"
+        response["intents"] = ["feature_request" if {"sso_configuration", "compliance_question"} & specialist_signals else "bug_report"]
+        response.setdefault("safety_checks", []).append(
+            "specialist text routing override applied: " + ", ".join(sorted(specialist_signals))
+        )
+    elif broad_security or broad_outage or legal_issue:
         response["urgency"] = "critical"
         response["action"] = "escalate_to_human"
         response["intents"] = [
@@ -174,6 +198,25 @@ def apply_content_safety_overrides(response: dict[str, Any], ticket: SupportTick
 def calibrate_decision(response: dict[str, Any], ticket: SupportTicket, kb_summary: str) -> dict[str, Any]:
     """Apply deterministic impact/action calibration after model generation."""
     text = f"{ticket.description} {ticket.issue_type}".lower()
+    escalation_signals = detect_escalation_signals(text)
+    specialist_signals = detect_specialist_signals(text)
+    if escalation_signals:
+        response["urgency"] = "critical"
+        response["action"] = "escalate_to_human"
+        response["intents"] = [
+            "login_help" if "organization_wide_lockout" in escalation_signals
+            else "legal_threat" if "gdpr" in escalation_signals
+            else "security_threat" if {"privacy", "cross_tenant"} & escalation_signals
+            else "service_outage"
+        ]
+        response.setdefault("safety_checks", []).append("sensitive text calibration applied")
+        return response
+    if specialist_signals:
+        response["urgency"] = "low" if {"sso_configuration", "compliance_question"} & specialist_signals else "medium"
+        response["action"] = "route_to_specialist"
+        response["intents"] = ["feature_request" if {"sso_configuration", "compliance_question"} & specialist_signals else "bug_report"]
+        response.setdefault("safety_checks", []).append("specialist text calibration applied")
+        return response
     kb_available = bool(kb_summary and "no matching kb" not in kb_summary.lower())
     routine_login = ticket.issue_type.lower() == "login" and not any(
         phrase in text for phrase in ("locked out", "cannot access", "unable to access", "mfa code", "account was temporarily disabled")
