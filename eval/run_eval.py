@@ -66,7 +66,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         results_dir = Path(args.results_dir)
         results_dir.mkdir(parents=True, exist_ok=True)
         stamp = datetime.now(UTC).date().isoformat()
-        output_path = results_dir / f"{args.model.replace('/', '_')}-{stamp}.json"
+        fixture_name = Path(args.file).stem
+        output_path = results_dir / f"{fixture_name}-{args.model.replace('/', '_')}-{stamp}.json"
         output_path.write_text(json.dumps({"model": args.model, "mode": args.mode, "metrics": result, "cases": cases}, indent=2), encoding="utf-8")
     if args.fail_on_critical and result.get("critical_cases_missed", 0) > 0:
         return 1

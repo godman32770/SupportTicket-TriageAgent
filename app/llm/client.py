@@ -150,6 +150,11 @@ class OfflineLLMClient(LLMClient):
             return json.dumps({"type": "tool_call", "name": "customer_history"})
         if "knowledge_base" in available_tools:
             return json.dumps({"type": "tool_call", "name": "knowledge_base"})
+        if "check_service_status" in available_tools and any(
+            phrase in str(ticket.get("description", "")).lower()
+            for phrase in ("outage", "down", "unavailable", "500", "system inaccessible")
+        ):
+            return json.dumps({"type": "tool_call", "name": "check_service_status"})
 
         description = str(ticket.get("description", "")).lower()
         urgency = _infer_urgency(description)
@@ -179,8 +184,11 @@ class OfflineLLMClient(LLMClient):
         elif issue == "bug" or "crash" in description:
             urgency, action = "medium", "route_to_specialist"
             intent = "bug_report"
-        elif issue == "feature_request" or "feature" in description:
+        elif (issue == "feature_request" or "feature" in description) and "dark mode" not in description and "does not activate" not in description:
             urgency, action = "low", "auto_respond"
+            intent = "feature_request"
+        elif "dark mode" in description or "does not activate" in description:
+            urgency, action = "medium", "route_to_specialist"
             intent = "feature_request"
         elif "locked out" in description or "cannot access" in description or "unable to access" in description or ("urgent" in description and ("login" in description or "access" in description or "account" in description)):
             urgency, action = "high", "escalate_to_human"
@@ -234,8 +242,11 @@ class OpenAIChatClient(LLMClient):
         self.client = OpenAI(api_key=self.api_key, timeout=self.timeout_seconds)
 
     @staticmethod
-    def _tools() -> list[dict[str, Any]]:
-        return [
+    def _tools(available_tools: list[str] | None = None) -> list[dict[str, Any]]:
+        requested = set(available_tools or ["customer_history", "knowledge_base"])
+        tools: list[dict[str, Any]] = []
+        if "customer_history" in requested:
+            tools.append(
             {
                 "type": "function",
                 "function": {
@@ -249,7 +260,10 @@ class OpenAIChatClient(LLMClient):
                     },
                 },
             },
-            {
+            )
+        if "knowledge_base" in requested:
+            tools.append(
+                {
                 "type": "function",
                 "function": {
                     "name": "search_kb",
@@ -264,7 +278,28 @@ class OpenAIChatClient(LLMClient):
                         "additionalProperties": False,
                     },
                 },
-            },
+                },
+            )
+        if "check_service_status" in requested:
+            tools.append(
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "check_service_status",
+                        "description": "Check the configured service status endpoint for an outage or degradation.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "product": {"type": "string"},
+                                "region": {"type": "string"},
+                            },
+                            "required": ["product"],
+                            "additionalProperties": False,
+                        },
+                    },
+                },
+            )
+        tools.append(
             {
                 "type": "function",
                 "function": {
@@ -273,7 +308,8 @@ class OpenAIChatClient(LLMClient):
                     "parameters": {**TRIAGE_SCHEMA},
                 },
             },
-        ]
+        )
+        return tools
 
     @staticmethod
     def _retry_after(exc: BaseException) -> float | None:
@@ -298,17 +334,19 @@ class OpenAIChatClient(LLMClient):
 
         last_error: BaseException | None = None
         tool_choice: Any = {"type": "function", "function": {"name": "submit_triage"}} if context.get("force_submit") else "auto"
+        messages = list(context.get("messages", []))
+        if not messages:
+            messages = [{"role": "user", "content": prompt}]
+        available_tools = context.get("available_tools")
+        tool_definitions = self._tools(available_tools if isinstance(available_tools, list) else None)
         for attempt in range(self.max_retries + 1):
             try:
                 completion = self.client.chat.completions.create(
                     model=self.model,
                     temperature=0,
-                    tools=cast(Any, self._tools()),
+                    tools=cast(Any, tool_definitions),
                     tool_choice=tool_choice,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": prompt},
-                    ],
+                    messages=[{"role": "system", "content": system_prompt}, *messages],
                 )
                 usage = getattr(completion, "usage", None)
                 self.last_usage = {
@@ -330,7 +368,12 @@ class OpenAIChatClient(LLMClient):
                     if name == "submit_triage":
                         return json.dumps({"type": "final", "decision": json.loads(arguments)})
                     aliases = {"get_customer_history": "customer_history", "search_kb": "knowledge_base"}
-                    return json.dumps({"type": "tool_call", "name": aliases.get(name, name)})
+                    return json.dumps({
+                        "type": "tool_call",
+                        "name": aliases.get(name, name),
+                        "tool_call_id": getattr(call, "id", None) or f"call_{attempt}",
+                        "arguments": arguments,
+                    })
                 return message.content or '{"error": "empty response"}'
             except (OpenAIError, TimeoutError, OSError, ValueError, TypeError) as exc:  # pragma: no cover - live dependency path
                 last_error = exc

@@ -1,4 +1,4 @@
-.PHONY: test lint typecheck check demo-live eval eval-benchmark
+.PHONY: test lint typecheck check demo-live eval eval-benchmark eval-assignment
 
 test:
 	python -m pytest -q
@@ -19,3 +19,6 @@ eval:
 
 eval-benchmark:
 	python -m eval.run_eval --file eval/benchmark_30.json --mode offline --fail-on-critical
+
+eval-assignment:
+	python -m eval.run_eval --file eval/assignment_origin_eval.json --mode offline --fail-on-critical

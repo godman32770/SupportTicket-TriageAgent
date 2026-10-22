@@ -80,6 +80,27 @@ def test_orchestrator_runs_only_the_requested_tool():
     assert client.contexts[1]["kb"] == "Settings guide found."
 
 
+def test_ticket_metadata_is_owned_by_application():
+    wrong = _decision()
+    wrong.update({"product": "Safe", "issue_type": "service outage", "language": "en", "sentiment": "neutral"})
+    client = SequenceClient([{"type": "final", "decision": wrong}])
+
+    result = TriageAgent(llm_client=client).run({
+        "ticket_id": "T-60",
+        "customer_id": "C-60",
+        "product": "web_app",
+        "issue_type": "appearance_settings",
+        "description": "The dark mode setting does not activate.",
+        "language": "th",
+        "sentiment": "frustrated",
+    })
+
+    assert result.product == "web_app"
+    assert result.issue_type == "appearance_settings"
+    assert result.language == "th"
+    assert result.sentiment == "frustrated"
+
+
 def test_orchestrator_retries_invalid_decision_with_validation_feedback():
     invalid = _decision()
     invalid["urgency"] = "urgent"
@@ -149,7 +170,7 @@ def test_orchestrator_retries_malformed_tool_name():
 
 def test_tool_registry_lists_supported_tools():
     agent = TriageAgent(llm_client=SequenceClient([{"type": "final", "decision": _decision()}]))
-    assert agent.tool_registry.available() == ["customer_history", "knowledge_base"]
+    assert agent.tool_registry.available() == ["customer_history", "knowledge_base", "check_service_status"]
     assert agent.tool_registry.get("customer_history").name == "customer_history"
 
 

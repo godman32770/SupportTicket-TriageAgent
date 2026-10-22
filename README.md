@@ -157,12 +157,23 @@ The bundled 15-ticket fixture is a smoke benchmark for CI. The larger 30-ticket 
 python -m eval.run_eval --file eval/benchmark_30.json --mode offline --no-write
 ```
 
+Assignment-origin sample run:
+
+```bash
+make eval-assignment
+python -m eval.run_eval --file eval/assignment_origin_eval.json --mode live --model gpt-4o-mini
+```
+
+`eval/assignment_origin_eval.json` contains the three supplied Enterprise, Free, and Pro tickets from `tickets/sample_ticket_enterprise.json`, `tickets/sample_ticket_free.json`, and `tickets/sample_ticket_pro.json`. Their source intents are preserved on each ticket; the `gold` section maps them to this project’s canonical taxonomy.
+
+The assignment-origin fixture is intentionally separate from the synthetic benchmark. It checks the three supplied examples, but it is too small to support a general accuracy claim.
+
 ## Architecture overview
 
 The app is split into clear responsibilities:
 
 - `app/models/` defines structured ticket and triage output objects and the JSON schema
-- `app/tools/` contains read-only customer history and knowledge base lookups; KB lookup first uses structured fields and then falls back to ticket-description terms
+- `app/tools/` contains read-only customer history, knowledge-base, and configurable service-status lookups; KB lookup first uses structured fields and then falls back to ticket-description terms
 - `app/llm/` contains the live OpenAI adapter and the deterministic offline mock
 - `app/guardrails/` contains the policy guardrail checks used before accepting a model response
 - `app/agent/` contains the orchestrator loop and fallback logic
@@ -180,7 +191,7 @@ This keeps the project easy to extend while preserving a conservative, productio
 | JSON CLI intake | `app/cli/main.py` |
 | Urgency classification | `app/models/triage.py`, `app/agent/triage_agent.py` |
 | Structured extraction (product, issue type, sentiment, language, intents) | `app/models/triage.py`, `app/llm/client.py` |
-| Customer history + KB tools | `app/tools/customer_history.py`, `app/tools/kb_lookup.py` |
+| Customer history + KB + service status tools | `app/tools/`, `app/agent/triage_agent.py` |
 | Action decision: auto_respond / route_to_specialist / escalate_to_human | `app/agent/triage_agent.py`, `app/guardrails/policy.py` |
 | Deterministic safety guardrails | `app/guardrails/policy.py` |
 | Strict JSON schema validation | `app/models/triage.py` |
@@ -287,10 +298,25 @@ The 30-ticket fixture gives a less optimistic view. The majority-class baseline 
 |---|---:|---:|---:|---:|---:|
 | Majority baseline (30-ticket gold set) | 30 | 0.33 | 0.40 | 0.33 | 7 |
 | Offline deterministic mock (15-ticket smoke set) | 15 | 0.87 | 0.87 | 0.87 | 0 |
-| Offline deterministic mock (30-ticket benchmark) | 30 | 0.63 | 0.73 | 0.63 | 1 |
-| Live `gpt-4o-mini` (2026-10-22, post-fix rerun) | 30 | 0.57 | 0.70 | 0.57 | 2 |
+| Offline deterministic mock (30-ticket benchmark) | 30 | 0.83 | 0.80 | 0.70 | 0 |
+| Live `gpt-4o-mini` (2026-10-22 saved run) | 30 | 0.53 | 0.70 | 0.47 | 1 |
 
-The post-fix live run measured 0.83 escalation recall, 0.03 fallback rate, 5,211 ms latency p50, 9,564 ms p95, 2 model calls per ticket at p50, and approximately $2.28 projected cost per 10,000 tickets. Compared with the earlier run, reliability improved but two high-risk cases were not escalated, so the guardrail/evaluation policy still needs work. The complete per-case result is saved at `eval/results/gpt-4o-mini-2026-10-22.json`.
+The saved 30-ticket live run measured 0.92 escalation recall, 0.07 fallback rate, 5,644 ms latency p50, 10,902 ms p95, 4 model calls per ticket at p50, and approximately $1.71 projected cost per 10,000 tickets. It is one model/date snapshot, not a benchmark guarantee. The complete per-case result is saved at `eval/results/benchmark_30-gpt-4o-mini-2026-10-22.json`.
+
+### Assignment-origin live versus offline
+
+The offline run is deterministic and the live run was executed with the latest code using the three supplied assignment tickets. The fresh live result is saved at `eval/results/assignment_origin_eval-gpt-4o-mini-2026-10-22.json`.
+
+| Run | N | Urgency | Action | Overall* | Critical missed | Fallback | Metadata fields** |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Assignment-origin offline, current code | 3 | 1.00 | 1.00 | 1.00 | 0 | 0.00 | 1.00 |
+| Assignment-origin live `gpt-4o-mini`, fresh 2026-10-22 run | 3 | 1.00 | 1.00 | 1.00 | 0 | 0.00 | 1.00 |
+
+\* `overall_accuracy` is the runner's urgency/action pair metric; it does not include metadata fields.
+
+\*\* Mean of product, issue type, sentiment, language, and intent accuracy. The fresh live rerun scored 1.00 on all five fields.
+
+Both modes now score 1.00 on the three assignment-origin cases, with zero fallback and zero missed critical cases. This is strong evidence that the latest orchestration and metadata guardrails fixed the observed sample failures, but the sample is still too small to support a broad production accuracy claim.
 
 Live mode is a single command. Copy `.env.example` to `.env`, set a valid key, and run:
 
@@ -298,7 +324,7 @@ Live mode is a single command. Copy `.env.example` to `.env`, set a valid key, a
 make demo-live
 ```
 
-The command uses native OpenAI tool calls (`get_customer_history`, `search_kb`, and the forced final `submit_triage` call) and prints latency plus prompt/completion/total token counts. Live evaluation writes the expected labels and actual outputs to `eval/results/<model>-<date>.json`; use the same command with `python -m eval.run_eval --file eval/sample_eval.json --mode live` to generate a full benchmark result. Live results depend on the configured model, quota, and API response at run time, so repeat runs should be treated as separate measurements.
+The command uses native OpenAI tool calls (`get_customer_history`, `search_kb`, `check_service_status`, and the forced final `submit_triage` call) and prints latency plus prompt/completion/total token counts. Live evaluation writes the expected labels and actual outputs to `eval/results/<fixture>-<model>-<date>.json`; including the fixture name prevents benchmark and assignment runs from overwriting each other. Live results depend on the configured model, quota, and API response at run time, so repeat runs should be treated as separate measurements.
 
 Metrics returned include:
 
@@ -319,13 +345,15 @@ Important note: the offline mock is intentionally rule-based and tuned to the sa
 
 ### Retry and tool-call bounds
 
-The live model may choose whether to request one of the registered tools, but the outer agent enforces a bounded loop. By default, each ticket allows at most two tool calls (each registered tool once) and two outer model retries after a parse, schema, policy, or tool failure. The live OpenAI adapter adds two request retries for transient API failures, with exponential backoff capped at eight seconds. Once a bound is reached, the agent returns a deterministic human-escalation fallback. These limits are configurable through `TriageAgent(max_model_retries=..., max_tool_calls=...)` and `OpenAIChatClient(max_retries=...)`.
+The live model may choose whether to request one of the registered tools, but the outer agent enforces a bounded loop. By default, each ticket allows at most three tool calls (each registered tool once) and two outer model retries after a parse, schema, policy, or tool failure. The live OpenAI adapter adds two request retries for transient API failures, with exponential backoff capped at eight seconds. Once a bound is reached, the agent returns a deterministic human-escalation fallback. These limits are configurable through `TriageAgent(max_model_retries=..., max_tool_calls=...)` and `OpenAIChatClient(max_retries=...)`.
+
+For live outage verification, set `SERVICE_STATUS_URL` to an operator-controlled JSON status endpoint. The endpoint should return an object containing `status`, `indicator`, or `state`; without that variable, the tool reports that no platform-wide incident is confirmed and content-based safety rules still take priority.
 
 ## Design, operations, and rollout (summary)
 
 The custom orchestration loop is deliberately small: it makes tool order, validation, retries, audit events, and safe fallback behavior explicit without introducing framework-specific state. `gpt-4o-mini` is the default because it is a low-cost, low-latency model suitable for structured support routing; model and per-token prices are configurable through `MODEL_NAME`, `OPENAI_INPUT_COST_PER_MILLION`, and `OPENAI_OUTPUT_COST_PER_MILLION`. Guardrails remain code-based because prompts can be ignored, tool output is untrusted, and policy decisions must be deterministic and testable.
 
-The current offline smoke run reports 1.00 escalation recall, 1.00 intent accuracy, 3 LLM-loop calls per ticket at p50 and 5 at p95, and $0 offline cost. Latency is machine-dependent (the 2026-10-22 run measured 6.92 ms p50 and 28.28 ms p95). Live runs record `usage.prompt_tokens`, `usage.completion_tokens`, calculated cost, and a 10,000-ticket/day projection in `eval/results/`; live cost is intentionally environment/model dependent.
+The current assignment-origin offline run reports 1.00 escalation recall, 1.00 intent accuracy, 3 LLM-loop calls per ticket at p50, and $0 offline cost. Latency is machine-dependent (this run measured 8.7 ms p50 and 9.05 ms p95). Live runs record `usage.prompt_tokens`, `usage.completion_tokens`, calculated cost, and a 10,000-ticket/day projection in `eval/results/`; live cost is intentionally environment/model dependent.
 
 Known limitations include keyword-based policy matching, which can miss unusual phrasing, and uncalibrated model confidence scores. The next calibration step is to fit confidence against a held-out labeled set and only enable auto-response for categories whose measured precision exceeds 99% with no critical-case misses.
 
@@ -340,8 +368,8 @@ Production rollout starts in shadow mode with human approval. Human corrections 
 - The agent loop is intentionally bounded orchestration: the live model chooses whether to request a registered tool, but it cannot invent tools or run indefinitely. This improves auditability and safety at the cost of less open-ended agent behavior.
 - The benchmark labels are illustrative and not independently validated. The 30-ticket result is too small for a production claim, and the checked-in live score is only one model/date snapshot.
 - The majority baseline is only a reference point; the next evaluation step is a held-out, human-reviewed set with repeated live runs and error analysis by category.
-- All bundled tickets and labels are synthetic fixtures; they demonstrate behavior and regression coverage, not performance on real customer traffic.
-- The saved 2026-10-22 live result predates the current tool-state and KB-retrieval fixes; rerun the live benchmark before comparing post-fix model metrics.
+- The 30-ticket benchmark and 15-ticket smoke set are synthetic fixtures; the separate assignment-origin fixture uses the three supplied sample tickets but its canonical labels are still project annotations, not independently audited ground truth.
+- The saved 2026-10-22 live result predates the latest persistent-message and content-override changes; rerun the live benchmark before treating it as the final post-fix model measurement.
 
 ## Telemetry and privacy
 
@@ -453,7 +481,7 @@ We also separate the concerns between the tool layer, LLM adapter, schema valida
 
 Benchmarks and evidence:
 
-- Local deterministic suite: 50 tests passing (`pytest -q`)
+- Local deterministic suite: 53 tests passing (`pytest -q`)
 - Guardrail and schema tests: included in the project suite
 - Offline benchmark: deterministic mock and evaluation runner available via `eval/run_eval.py`
 - Live benchmark: run `make demo-live` or `python -m eval.run_eval --file eval/benchmark_30.json --mode live`; each run records expected and actual outcomes plus latency and token usage under `eval/results/`.

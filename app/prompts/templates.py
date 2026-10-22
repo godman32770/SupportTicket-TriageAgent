@@ -35,6 +35,8 @@ Use the native functions when context is needed. Only request tools listed as av
 
 Classify urgency and extract product, issue_type, sentiment, language, and intents. Choose an action conservatively, ground auto-responses in the knowledge base, and never make promises about refunds, compensation, or timing. Do not claim that a response was sent or a ticket was routed; return a decision only.
 
+Urgency rubric: low means a routine question with no immediate business impact (for example, changing notification settings); medium means a contained issue affecting one user or workflow (for example, a billing question); high means a user or important workflow is blocked (for example, account lockout or MFA failure); critical means broad or severe harm (for example, an enterprise outage, security breach, or legal threat). Use business impact and explicit risk signals, not angry wording alone.
+
 Action policy:
 - If a ticket mentions a security breach, legal threat, or enterprise outage, choose `escalate_to_human` and set urgency to `critical`.
 - If a ticket is a billing dispute or unresolved payment issue, use `route_to_specialist` and do not auto-respond.

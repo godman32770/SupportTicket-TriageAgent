@@ -31,4 +31,4 @@ jobs:
         run: python -m mypy --strict app
 
       - name: Run critical-case evaluation
-        run: python -m eval.run_eval --file eval/sample_eval.json --mode offline --fail-on-critical --no-write
+        run: python -m eval.run_eval --file eval/benchmark_30.json --mode offline --fail-on-critical --no-write
