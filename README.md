@@ -2,94 +2,64 @@
 
 [![CI](https://github.com/godman32770/SupportTicket-TriageAgent/actions/workflows/pytest.yml/badge.svg)](https://github.com/godman32770/SupportTicket-TriageAgent/actions/workflows/pytest.yml)
 
-A production-friendly support triage agent with deterministic guardrails, strict JSON schema validation, live/offline LLM support, telemetry, redaction, evaluation tooling, and a JSON-first CLI.
+A conservative support-ticket triage agent. An LLM proposes a decision (urgency, metadata, and one of `auto_respond` / `route_to_specialist` / `escalate_to_human`); **deterministic code decides whether that proposal is allowed to leave the system.** Anything malformed, ungrounded, or risky is rejected and, after bounded retries, replaced by a safe human escalation.
+
+**Design principle:** the model is untrusted. Prompts can be ignored and tool output can be hostile, so safety lives in code that is testable, not in the prompt.
+
+## At a glance
+
+| | |
+|---|---|
+| Input | JSON ticket (single object or array) via CLI or Python |
+| Output | Validated JSON: urgency, product, issue type, sentiment, language, intents, action, confidence, reasoning, history/KB summaries, safety checks |
+| Tools (read-only) | Customer history, knowledge base, service status |
+| Modes | `offline` (deterministic mock, no key, used in CI) and `live` (OpenAI, native tool calls) |
+| Safety | Strict schema validation + 10 policy guardrails + bounded retries + guaranteed fallback to human escalation |
+| Quality gates (CI) | pytest, Ruff, `mypy --strict`, critical-case eval gate |
+| Latest live result | `gpt-4o-mini`, 30-ticket benchmark: 0.97 urgency, 0.93 action, **0 critical cases missed** (see [Results](#results)) |
 
 ## Table of contents
 
-- [Overview](#overview)
-- [Features](#features)
-- [Installation](#installation)
-- [Running the CLI](#running-the-cli)
-- [Architecture overview](#architecture-overview)
-- [Requirement coverage](#requirement-coverage)
+- [Quickstart](#quickstart)
+- [How it works](#how-it-works)
 - [Guardrails](#guardrails)
-- [Testing](#testing)
-- [GitHub Actions](#github-actions)
-- [Evaluation](#evaluation)
+- [Results](#results)
+- [Evaluation workflow](#evaluation-workflow)
+- [Design decisions](#design-decisions)
 - [Limitations](#limitations)
+- [Production rollout plan](#production-rollout-plan)
+- [Roadmap](#roadmap)
+- [Testing and CI](#testing-and-ci)
 - [Telemetry and privacy](#telemetry-and-privacy)
 - [Docker](#docker)
 - [Command reference](#command-reference)
 - [Project structure](#project-structure)
-- [Workflow diagram](#workflow-diagram)
-- [Notes](#notes)
 
-## Overview
-
-This project is a safe AI customer support triage workflow designed to analyze incoming support tickets, extract structured metadata, consult customer history and a KB, and make a conservative decision about whether to auto-respond, route to a specialist, or escalate to a human.
-
-It is intentionally policy-checked and deterministic: the model can suggest a decision, but the final output must pass rigid validation and guardrail checks before it is returned.
-
-## Features
-
-- Accepts support tickets as JSON from a file or a structured Python payload
-- Classifies urgency as low, medium, high, or critical
-- Extracts structured metadata: product, issue type, sentiment, language, and intents
-- Uses customer-history and knowledge-base tools before making a decision
-- Applies deterministic policy guardrails before accepting any output
-- Validates model output against a strict JSON schema
-- Supports both live OpenAI mode and offline/mock mode for CI and testing
-- Falls back safely when tooling, parsing, LLM output, or policy checks fail
-- Includes evaluation scripts and unit tests for quality and reliability
-- Adds PII redaction and lightweight telemetry for production-minded logging
-- Includes stronger benchmark-style eval fixtures and policy mapping for realistic safety review
-
-## Installation
-
-1. Clone or open the project directory.
-2. Create and activate a virtual environment (optional but recommended):
-
-   Windows PowerShell:
-   ```powershell
-   python -m venv .venv
-   .\.venv\Scripts\Activate.ps1
-   ```
-
-   macOS/Linux:
-   ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate
-   ```
-
-3. Install the app and development dependencies:
-
-   ```bash
-   python -m pip install --upgrade pip
-   python -m pip install -e .
-   python -m pip install pytest
-   ```
-
-4. Optional: set a live OpenAI key for `--mode live`:
-
-   PowerShell:
-   ```powershell
-   $env:OPENAI_API_KEY = "your-key-here"
-   ```
-
-   macOS/Linux:
-   ```bash
-   export OPENAI_API_KEY=your-key-here
-   ```
-
-## Running the CLI
-
-Run triage from the project root. Example quick run in offline mode:
+## Quickstart
 
 ```bash
+python -m venv .venv && source .venv/bin/activate      # Windows: .\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+
 python -m app.cli.main --ticket-file tickets/sample_ticket.json --mode offline --pretty
 ```
 
-Example output (offline mode):
+Input (`tickets/sample_ticket.json`):
+
+```json
+{
+  "ticket_id": "T-100",
+  "customer_id": "C-100",
+  "product": "mobile_app",
+  "issue_type": "login",
+  "description": "I cannot log in after password reset and it is urgent.",
+  "language": "en",
+  "sentiment": "frustrated"
+}
+```
+
+Output (offline mode; `reasoning` and `safety_checks` are also emitted but trimmed here):
 
 ```json
 {
@@ -107,415 +77,266 @@ Example output (offline mode):
 }
 ```
 
-The CLI also emits `reasoning` and `safety_checks`; those fields are shortened above for readability.
+The customer flags the issue as urgent, and the agent returns `high` urgency with `escalate_to_human` instead of auto-responding.
 
-Flags:
-
-- `--ticket-file` path to a JSON support ticket file
-- `--mode offline` uses the embedded deterministic mock
-- `--mode live` uses OpenAI (requires API key)
-- `--model` overrides the live model name
-- `--pretty` pretty-prints the final JSON output
-
-Additional offline examples:
+**Live mode** (needs an OpenAI key):
 
 ```bash
-python -m app.cli.main --ticket-file tickets/sample_ticket_free.json --mode offline --pretty
-python -m app.cli.main --ticket-file tickets/sample_ticket_enterprise.json --mode offline --pretty
-python -m app.cli.main --ticket-file tickets/sample_ticket_pro.json --mode offline --pretty
+cp .env.example .env        # set OPENAI_API_KEY
+make demo-live              # runs live triage; prints latency and token counts
 ```
 
-Batch validation workflow:
+Other flags: `--model` overrides the live model, `--pretty` pretty-prints JSON. The CLI is read-only: it never replies to customers or triggers external workflows.
 
-The CLI accepts either a single ticket object or a JSON array of ticket objects. Use category-specific batch files to validate the main triage paths.
+More sample tickets: `tickets/sample_ticket_{free,pro,enterprise}.json` and category batches `tickets/batch_{login,billing,outage,security,prompt}.json`.
 
-```powershell
-$env:OPENAI_API_KEY = "your-key-here"
+## How it works
 
-python -m app.cli.main --ticket-file tickets/batch_login.json --mode live --pretty > live_login.json
-python -m app.cli.main --ticket-file tickets/batch_billing.json --mode live --pretty > live_billing.json
-python -m app.cli.main --ticket-file tickets/batch_outage.json --mode live --pretty > live_outage.json
-python -m app.cli.main --ticket-file tickets/batch_security.json --mode live --pretty > live_security.json
-python -m app.cli.main --ticket-file tickets/batch_prompt.json --mode live --pretty > live_prompt.json
+```mermaid
+flowchart TD
+   A([Incoming ticket]) --> B[Normalize ticket]
+   B --> C[LLM turn]
+   C -->|tool call| T[Customer history / KB / service status<br/>each at most once, max 3 calls]
+   T --> C
+   C -->|submit_triage| E[Schema validation]
+   E -->|invalid| R
+   E -->|valid| F[Policy guardrails]
+   F -->|pass| G([Return decision])
+   F -->|violations| R[Feed violations back to model<br/>max 2 retries]
+   R --> C
+   R -->|retries exhausted or LLM/tool failure| H[Deterministic safe fallback]
+   H -->|fails validation too| I([Forced human escalation])
+   H --> J([Return fallback decision])
 ```
 
-Then compare the live outputs against the bundled gold benchmark:
+1. **Normalize** the ticket into a typed model.
+2. **LLM loop.** The live model may request a registered tool (`get_customer_history`, `search_kb`, `check_service_status`) or submit its answer with the forced final `submit_triage` call. Each tool may be called once, with at most three calls per ticket; unknown or repeated tool requests are rejected.
+3. **Validate.** Output must pass strict schema validation, then the policy guardrails. Guardrails do not rewrite decisions: a violating decision is rejected, and the violation text is returned to the model as feedback for the retry.
+4. **Fall back.** On parse errors, schema or policy failures, tool failures, or exhausted retries the agent returns a deterministic, low-confidence `escalate_to_human` decision. If even that fails validation, it is replaced with a forced critical escalation.
 
-```bash
-python eval/run_eval.py --file eval/sample_eval.json --mode live --model gpt-4o-mini
-```
+Code map:
 
-Offline benchmark command:
-
-```bash
-python eval/run_eval.py --file eval/sample_eval.json --mode offline
-```
-
-The bundled 15-ticket fixture is a smoke benchmark for CI. The larger 30-ticket fixture is the more useful offline stress test:
-
-```bash
-python -m eval.run_eval --file eval/benchmark_30.json --mode offline --no-write
-```
-
-Assignment-origin sample run:
-
-```bash
-make eval-assignment
-python -m eval.run_eval --file eval/assignment_origin_eval.json --mode live --model gpt-4o-mini
-```
-
-`eval/assignment_origin_eval.json` contains the three supplied Enterprise, Free, and Pro tickets from `tickets/sample_ticket_enterprise.json`, `tickets/sample_ticket_free.json`, and `tickets/sample_ticket_pro.json`. Their source intents are preserved on each ticket; the `gold` section maps them to this project’s canonical taxonomy.
-
-The assignment-origin fixture is intentionally separate from the synthetic benchmark. It checks the three supplied examples, but it is too small to support a general accuracy claim.
-
-## Architecture overview
-
-The app is split into clear responsibilities:
-
-- `app/models/` defines structured ticket and triage output objects and the JSON schema
-- `app/tools/` contains read-only customer history, knowledge-base, and configurable service-status lookups; KB lookup first uses structured fields and then falls back to ticket-description terms
-- `app/llm/` contains the live OpenAI adapter and the deterministic offline mock
-- `app/guardrails/` contains the policy guardrail checks used before accepting a model response
-- `app/agent/` contains the orchestrator loop and fallback logic
-- `app/cli/` contains the JSON CLI entry point
-- `app/telemetry/` contains redaction and basic metrics collection
-- `eval/` contains evaluation fixtures and scoring scripts
-- `tests/` covers tool calls, guardrails, parsing, fallback, and CLI behavior
-
-This keeps the project easy to extend while preserving a conservative, production-oriented decision pipeline.
-
-## Requirement coverage
-
-| Requirement | Where it is implemented |
+| Concern | Location |
 |---|---|
-| JSON CLI intake | `app/cli/main.py` |
-| Urgency classification | `app/models/triage.py`, `app/agent/triage_agent.py` |
-| Structured extraction (product, issue type, sentiment, language, intents) | `app/models/triage.py`, `app/llm/client.py` |
-| Customer history + KB + service status tools | `app/tools/`, `app/agent/triage_agent.py` |
-| Action decision: auto_respond / route_to_specialist / escalate_to_human | `app/agent/triage_agent.py`, `app/guardrails/policy.py` |
-| Deterministic safety guardrails | `app/guardrails/policy.py` |
-| Strict JSON schema validation | `app/models/triage.py` |
-| Fallback handling for failures and invalid outputs | `app/agent/triage_agent.py` |
-| Live and offline LLM modes | `app/llm/client.py` |
-| Eval scripts and metrics | `eval/run_eval.py`, `app/eval/metrics.py` |
-| Unit tests | `tests/` |
-| Clean typed structure | Package layout under `app/` |
+| CLI intake | `app/cli/main.py` |
+| Ticket and decision models, JSON schema | `app/models/` |
+| Orchestrator loop, retries, fallback | `app/agent/triage_agent.py` |
+| Tools (history, KB, service status) | `app/tools/` |
+| Live OpenAI adapter and offline mock | `app/llm/client.py` |
+| Policy guardrails | `app/guardrails/policy.py` |
+| Redaction and metrics | `app/telemetry/` |
+| Eval runner and metrics | `eval/run_eval.py`, `app/eval/metrics.py` |
+
+Tool notes: KB lookup first uses structured fields (product, issue type) and then falls back to ticket-description terms. For live outage verification, set `SERVICE_STATUS_URL` to an operator-controlled JSON endpoint returning `status`, `indicator`, or `state`; without it, the tool reports that no platform-wide incident is confirmed, and content-based safety rules still take priority.
 
 ## Guardrails
 
-| Guardrail ID | Trigger condition | Action when activated | Notes |
-|---|---|---|---|
-| billing_no_auto | Billing dispute, chargeback, unresolved payment, or invoice issue is present | Prevent auto_respond; route or escalate | Protects against financial/legal misclassification |
-| enterprise_outage_escalate | Enterprise customer + outage/down/service unavailable | Force `escalate_to_human` and critical urgency | High-impact customer outage policy |
-| sec_escalate | Security, breach, data loss, legal threat, or lawsuit signal | Prevent auto_respond, set urgency >= high | Security/legal cases are human-first |
-| prompt_injection_escalate | Instruction bypass, prompt injection, malicious behavior, or override attempts | Discard draft and escalate | Treat as risky input |
-| no_promises | Refund, compensation, ETA, or commitment language appears in the proposed draft or response | Hold or replace auto draft | Avoid unauthorized promises |
-| draft_language_matches | Draft language does not match ticket language | Replace or human-review the draft | Keeps responses linguistically safe |
-| ungrounded_auto_respond | Auto decision attempted without KB evidence or KB has no match | Prevent auto_respond; route to specialist | Ensures factual grounding |
-| low_confidence_escalate | Confidence falls below the configured threshold | Prevent auto_respond; route or escalate | Keeps low-confidence replies safe |
-| action_matches_intents | Requested intent or context already implies escalation or specialist handling | Prevent unsafe auto action | Intent-based override |
+Guardrails are conservative by design and prioritize safety over convenience. All live in `app/guardrails/policy.py` and are covered by `tests/test_guardrails.py`.
 
-Notes:
+| ID | Triggered when | Decision is rejected unless |
+|---|---|---|
+| `account_access_escalate` | Locked out, cannot sign in, MFA code not working, etc. | action is `escalate_to_human` |
+| `billing_no_auto` | Billing dispute, chargeback, unresolved payment, or unpaid invoices | action is not `auto_respond` |
+| `enterprise_outage_escalate` | Enterprise product plus outage / down / service unavailable | action is `escalate_to_human` **and** urgency is `critical` |
+| `sec_escalate` | Security, breach, data loss, legal threat, or lawsuit signal | action is not `auto_respond`, and urgency is at least `high` or the action is `escalate_to_human` |
+| `prompt_injection_escalate` | Instruction-bypass language, or a prompt-injection safety flag | action is not `auto_respond` |
+| `no_promises` | Refund, compensation, or ETA language | action is not `auto_respond` |
+| `draft_language_matches` | Draft language differs from ticket language | no `language_mismatch` flag is raised |
+| `ungrounded_auto_respond` | `auto_respond` without KB evidence, or KB had no match | action is not `auto_respond` |
+| `low_confidence_escalate` | Confidence below 0.75 | action is not `auto_respond` |
+| `action_matches_intents` | Intents already imply human or specialist handling | action is not `auto_respond` |
 
-- Guardrails are conservative by design and intentionally prioritize safety over convenience.
-- The policy logic lives in `app/guardrails/policy.py` and is covered by tests in `tests/`.
-- The action is always chosen from the allowed set: `auto_respond`, `route_to_specialist`, or `escalate_to_human`.
+Plus general rules: valid urgency and action values, required product/issue type, at least one intent, confidence in `[0, 1]`, and no `auto_respond` for `high` or `critical` urgency.
 
-## Testing
+**Illustrative trace** (not a recorded run): the model proposes `auto_respond` for a ticket that mentions a chargeback. `billing_no_auto` returns a violation, the violation is fed back, and the model retries. If it still proposes an unsafe action after two retries, the deterministic fallback escalates to a human.
 
-Run the full suite:
+## Results
 
-```bash
-python -m pytest -q
-```
+All numbers come from `python -m eval.run_eval`. Per-case results are written to `eval/results/<fixture>-<mode>-<model>-<date>.json`, so offline, live, benchmark, and assignment runs never overwrite each other.
 
-Run a specific file:
+| Evaluation | N | Urgency acc. | Action acc. | Overall acc. | Critical missed |
+|---|---:|---:|---:|---:|---:|
+| Majority baseline (always `low` / `escalate_to_human`) | 30 | 0.33 | 0.40 | 0.33 | 7 |
+| Offline mock, smoke set | 15 | 0.87 | 0.87 | 0.87 | 0 |
+| Offline mock, 30-ticket benchmark (calibrated) | 30 | 1.00 | 1.00 | 1.00 | 0 |
+| **Live `gpt-4o-mini`, 30-ticket benchmark (2026-10-22, calibrated)** | 30 | 0.97 | 0.93 | 0.90 | 0 |
+| Assignment-origin tickets, offline | 3 | 1.00 | 1.00 | 1.00 | 0 |
+| Assignment-origin tickets, live `gpt-4o-mini` | 3 | 1.00 | 1.00 | 1.00 | 0 |
 
-```bash
-python -m pytest tests/test_guardrails.py -q
-```
+`overall_accuracy` is the urgency/action pair metric and excludes metadata fields.
 
-## GitHub Actions
-
-This repository includes CI at `.github/workflows/pytest.yml`. It runs pytest, Ruff, mypy, and the critical-case evaluation gate:
-
-```yaml
-name: pytest
-
-on:
-  push:
-    branches: [main, master]
-  pull_request:
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - run: python -m pip install -e ".[dev]"
-      - run: python -m pytest -q
-      - run: python -m ruff check app eval tests
-      - run: python -m mypy --strict app
-      - run: python -m eval.run_eval --file eval/sample_eval.json --mode offline --fail-on-critical --no-write
-```
-
-## Evaluation
-
-The eval runner can compare gold labels against either:
-
-1. a precomputed predictions list, or
-2. actual agent outputs generated from a `tickets` list using the live/offline triage agent
-
-Example using the bundled fixture:
-
-```bash
-python -m eval.run_eval --file eval/sample_eval.json --mode offline
-```
-
-Offline sample benchmark (15 tickets; generated by `python -m eval.run_eval --file eval/sample_eval.json --mode offline`):
+**Live run detail (30 tickets, one model/date snapshot):**
 
 | Metric | Value |
-|---|---:|
-| urgency_accuracy | 0.87 |
-| action_accuracy | 0.87 |
-| overall_accuracy | 0.87 |
-| fallback_rate | 0.13 |
-| kb_grounding_rate | 1.00 |
-| product_accuracy | 1.00 |
-| issue_type_accuracy | 1.00 |
-| sentiment_accuracy | 1.00 |
-| language_accuracy | 1.00 |
-| intents_accuracy | 1.00 |
-| kb_hit_rate | 0.47 |
-| safety_policy_pass_rate | 1.00 |
+|---|---|
+| Escalation recall | 1.00 |
+| Fallback rate | 0.00 |
+| Latency p50 / p95 | 6,076 ms / 7,552 ms |
+| Model calls per ticket (p50) | 4 |
+| Projected cost | about $1.66 per 10,000 tickets |
+| Product, issue type, sentiment, language accuracy | 1.00 each |
+| Intent accuracy | 0.97 |
 
-The 30-ticket fixture gives a less optimistic view. The majority-class baseline always predicts `low` urgency and `escalate_to_human` action. Live results are reported separately because they require an API key, incur cost, and vary by model and run.
+Full per-case output: `eval/results/benchmark_30-live-gpt-4o-mini-2026-10-22.json`.
 
-| Evaluation | N | Urgency accuracy | Action accuracy | Overall accuracy | Critical cases missed |
-|---|---:|---:|---:|---:|---:|
-| Majority baseline (30-ticket gold set) | 30 | 0.33 | 0.40 | 0.33 | 7 |
-| Offline deterministic mock (15-ticket smoke set) | 15 | 0.87 | 0.87 | 0.87 | 0 |
-| Offline deterministic mock (30-ticket benchmark, calibrated) | 30 | 1.00 | 1.00 | 1.00 | 0 |
-| Live `gpt-4o-mini` (2026-10-22 calibrated rerun) | 30 | 0.97 | 0.93 | 0.90 | 0 |
+**Error analysis.** The four live misses were all on the safe side except one scoring miss:
+- Two routine requests were *routed* instead of auto-responded (conservative; KB coverage for routine password, billing, and account-setting questions is too thin to ground an auto-reply).
+- One payment-due-date request was scored `low` instead of `medium`.
+- One routine MFA-settings ticket received an extra `service_outage` intent.
 
-The calibrated 30-ticket live rerun measured 1.00 escalation recall, 0.00 fallback rate, 6,076 ms latency p50, 7,552 ms p95, 4 model calls per ticket at p50, and approximately $1.66 projected cost per 10,000 tickets. It is one model/date snapshot, not a benchmark guarantee. The complete per-case result is saved at `eval/results/benchmark_30-live-gpt-4o-mini-2026-10-22.json`.
+**How to read these numbers.** Be careful with the 1.00 rows:
+- The 30-ticket benchmark is synthetic and was used to calibrate the offline mock and policy rules, so offline 1.00 shows the rules fit that set, not that they generalize.
+- The live rerun happened after policy changes informed by earlier failures, so it is also not a clean held-out test.
+- The 15-ticket set is a CI smoke test; the 3-ticket assignment set cannot support any accuracy claim.
+- `fallback_rate` matters alongside `safety_policy_pass_rate`: a 1.00 pass rate can hide policy failures that were silently replaced by fallback (the smoke set has a 0.13 fallback rate).
+- Labels are project annotations, not independently audited ground truth.
 
-The calibrated offline rerun reached 1.00 urgency accuracy, 1.00 action accuracy, 1.00 escalation recall, 1.00 metadata/intent accuracy, and 0.00 fallback rate. This improvement is deterministic evidence that the policy changes fit the checked-in benchmark; it is not a substitute for rerunning the live model.
+The offline baseline run on the smoke set also reports `kb_grounding_rate` 1.00, `kb_hit_rate` 0.47, `safety_policy_pass_rate` 1.00, and 1.00 on product, issue type, sentiment, language, and intents accuracy.
 
-The live rerun's remaining errors were three conservative/routing decisions: two routine requests were routed instead of auto-responded, and one payment-due-date request was scored low instead of medium. Intent accuracy was 0.97 because one routine MFA-settings ticket received an extra `service_outage` intent. Product, issue type, sentiment, and language accuracy were all 1.00. The main next improvement is expanding KB coverage for routine password, billing, and account-setting questions so the model can safely auto-respond.
-
-### Assignment-origin live versus offline
-
-The offline run is deterministic and the live run was executed with the latest code using the three supplied assignment tickets. The fresh live result is saved at `eval/results/assignment_origin_eval-gpt-4o-mini-2026-10-22.json`; future runs use the mode-aware filename format documented below.
-
-| Run | N | Urgency | Action | Overall* | Critical missed | Fallback | Metadata fields** |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| Assignment-origin offline, current code | 3 | 1.00 | 1.00 | 1.00 | 0 | 0.00 | 1.00 |
-| Assignment-origin live `gpt-4o-mini`, fresh 2026-10-22 run | 3 | 1.00 | 1.00 | 1.00 | 0 | 0.00 | 1.00 |
-
-\* `overall_accuracy` is the runner's urgency/action pair metric; it does not include metadata fields.
-
-\*\* Mean of product, issue type, sentiment, language, and intent accuracy. The fresh live rerun scored 1.00 on all five fields.
-
-Both modes now score 1.00 on the three assignment-origin cases, with zero fallback and zero missed critical cases. This is strong evidence that the latest orchestration and metadata guardrails fixed the observed sample failures, but the sample is still too small to support a broad production accuracy claim.
-
-Live mode is a single command. Copy `.env.example` to `.env`, set a valid key, and run:
+## Evaluation workflow
 
 ```bash
-make demo-live
+# Offline (deterministic, used in CI)
+python -m eval.run_eval --file eval/sample_eval.json --mode offline
+python -m eval.run_eval --file eval/benchmark_30.json --mode offline --no-write
+
+# Live (needs OPENAI_API_KEY; costs money; results vary by model and run)
+python -m eval.run_eval --file eval/benchmark_30.json --mode live --model gpt-4o-mini
+make eval-assignment
 ```
 
-The command uses native OpenAI tool calls (`get_customer_history`, `search_kb`, `check_service_status`, and the forced final `submit_triage` call) and prints latency plus prompt/completion/total token counts. Evaluation writes the expected labels and actual outputs to `eval/results/<fixture>-<mode>-<model>-<date>.json`; including both the fixture and mode prevents benchmark, assignment, live, and offline runs from overwriting each other. Live results depend on the configured model, quota, and API response at run time, so repeat runs should be treated as separate measurements.
+Fixtures:
 
-Metrics returned include:
+| File | Tickets | Purpose |
+|---|---:|---|
+| `eval/sample_eval.json` | 15 | CI smoke benchmark |
+| `eval/benchmark_30.json` | 30 | Stronger offline and live stress test |
+| `eval/assignment_origin_eval.json` | 3 | The three supplied Enterprise, Free, and Pro tickets; source intents preserved, `gold` mapped to this project's taxonomy |
 
-- `urgency_accuracy`
-- `action_accuracy`
-- `overall_accuracy`
-- `fallback_rate`
-- `product_accuracy`
-- `issue_type_accuracy`
-- `sentiment_accuracy`
-- `language_accuracy`
-- `intents_accuracy`
-- `kb_grounding_rate`
-- `safety_policy_pass_rate`
-- optional latency and tool-success summaries when present
+The CLI also accepts a JSON array, so you can triage whole batches (for example `tickets/batch_security.json`) and diff outputs by hand.
 
-Important note: the offline mock is intentionally rule-based and tuned to the sample benchmark. It is useful for deterministic CI and guardrail checks, but it is not a production-grade evaluator. The score only becomes meaningful once you replace the mock with a realistic benchmark corpus and live validation workflow.
+Metrics reported: `urgency_accuracy`, `action_accuracy`, `overall_accuracy`, `fallback_rate`, `product_accuracy`, `issue_type_accuracy`, `sentiment_accuracy`, `language_accuracy`, `intents_accuracy`, `kb_grounding_rate`, `kb_hit_rate`, `safety_policy_pass_rate`, plus latency, token, cost, and tool-success summaries when available. `--fail-on-critical` makes the run exit non-zero if any critical case is under-triaged; CI uses it.
 
-### Retry and tool-call bounds
+## Design decisions
 
-The live model may choose whether to request one of the registered tools, but the outer agent enforces a bounded loop. By default, each ticket allows at most three tool calls (each registered tool once) and two outer model retries after a parse, schema, policy, or tool failure. The live OpenAI adapter adds two request retries for transient API failures, with exponential backoff capped at eight seconds. Once a bound is reached, the agent returns a deterministic human-escalation fallback. These limits are configurable through `TriageAgent(max_model_retries=..., max_tool_calls=...)` and `OpenAIChatClient(max_retries=...)`.
-
-For live outage verification, set `SERVICE_STATUS_URL` to an operator-controlled JSON status endpoint. The endpoint should return an object containing `status`, `indicator`, or `state`; without that variable, the tool reports that no platform-wide incident is confirmed and content-based safety rules still take priority.
-
-## Design, operations, and rollout (summary)
-
-The custom orchestration loop is deliberately small: it makes tool order, validation, retries, audit events, and safe fallback behavior explicit without introducing framework-specific state. `gpt-4o-mini` is the default because it is a low-cost, low-latency model suitable for structured support routing; model and per-token prices are configurable through `MODEL_NAME`, `OPENAI_INPUT_COST_PER_MILLION`, and `OPENAI_OUTPUT_COST_PER_MILLION`. Guardrails remain code-based because prompts can be ignored, tool output is untrusted, and policy decisions must be deterministic and testable.
-
-The current assignment-origin offline run reports 1.00 escalation recall, 1.00 intent accuracy, 3 LLM-loop calls per ticket at p50, and $0 offline cost. Latency is machine-dependent (this run measured 8.7 ms p50 and 9.05 ms p95). Live runs record `usage.prompt_tokens`, `usage.completion_tokens`, calculated cost, and a 10,000-ticket/day projection in `eval/results/`; live cost is intentionally environment/model dependent.
-
-Known limitations include keyword-based policy matching, which can miss unusual phrasing, and uncalibrated model confidence scores. The next calibration step is to fit confidence against a held-out labeled set and only enable auto-response for categories whose measured precision exceeds 99% with no critical-case misses.
-
-Production rollout starts in shadow mode with human approval. Human corrections become labeled examples with the original ticket, model output, corrected action/urgency, and reason; they are split by time/customer to avoid leakage. Promotion requires the precision threshold above, complete critical-case recall, and stable p95 latency/cost. Monitor escalation recall, action precision, fallback rate, tool success, schema/policy failures, p50/p95 latency, tokens, cost, and disagreement rate. During development, live tool invocation initially failed because JSON response formatting competed with tool calls; replacing it with native tools and a forced final `submit_triage` call resolved that failure.
+- **Small custom loop instead of an agent framework.** Normalize, tool context, LLM, schema validation, guardrails, fallback. This keeps tool order, retries, audit events, and fallback behavior explicit and debuggable. Trade-off: less declarative than a framework graph.
+- **Bounded autonomy.** The live model chooses whether to request a registered tool, but cannot invent tools, repeat them, or loop forever. Auditability and safety are bought at the cost of less open-ended agent behavior.
+- **Guardrails in code, not prompts.** Prompts can be ignored and tool output is untrusted; policy decisions must be deterministic and unit-testable.
+- **Native tool calls with a forced final `submit_triage` call.** During development, live tool use initially failed because JSON-mode response formatting competed with tool calls. Native tools plus a forced final call resolved it.
+- **Separation of concerns** between tools, LLM adapter, schema validator, and policy guardrail, so each can change without rewriting the pipeline.
+- **`gpt-4o-mini` by default** as a low-cost, low-latency model suited to structured routing. Model and per-token prices are configurable via `MODEL_NAME`, `OPENAI_INPUT_COST_PER_MILLION`, and `OPENAI_OUTPUT_COST_PER_MILLION`.
+- **Retry bounds.** Defaults: at most 3 tool calls (each tool once) and 2 outer model retries after a parse, schema, policy, or tool failure; the OpenAI adapter adds 2 request retries for transient API errors with exponential backoff capped at 8 s. Configure via `TriageAgent(max_model_retries=..., max_tool_calls=...)` and `OpenAIChatClient(max_retries=...)`.
 
 ## Limitations
 
-- The offline mock is rule-based and tuned to a small sample set; it is not a real production benchmark.
-- The eval set is small, human-reviewed data is still missing, and a larger benchmark is needed for confidence.
-- Live mode is subject to OpenAI cost and model drift, so budget caps and dataset versioning matter.
-- `fallback_rate` is an important safety metric because it catches policy failures that a high `safety_policy_pass_rate` can hide.
-- The agent loop is intentionally bounded orchestration: the live model chooses whether to request a registered tool, but it cannot invent tools or run indefinitely. This improves auditability and safety at the cost of less open-ended agent behavior.
-- The benchmark labels are illustrative and not independently validated. The 30-ticket result is too small for a production claim, and the checked-in live score is only one model/date snapshot.
-- The majority baseline is only a reference point; the next evaluation step is a held-out, human-reviewed set with repeated live runs and error analysis by category.
-- The 30-ticket benchmark and 15-ticket smoke set are synthetic fixtures; the separate assignment-origin fixture uses the three supplied sample tickets but its canonical labels are still project annotations, not independently audited ground truth.
-- The older `benchmark_30-gpt-4o-mini-2026-10-22.json` artifact is retained for historical comparison; use the mode-aware `benchmark_30-live-gpt-4o-mini-2026-10-22.json` file for the calibrated live rerun.
+- **Keyword-based policy matching** can miss unusual phrasing and can over-trigger on generic words. Guardrails also read model-written fields (reasoning, summaries), not just the ticket text.
+- **Model confidence is uncalibrated**, so the 0.75 auto-respond threshold is a heuristic.
+- **Small, synthetic, self-annotated benchmarks.** Human-reviewed data is missing, and the 30-ticket set is too small for a production claim. The live score is one model/date snapshot subject to model drift and cost.
+- **The offline mock is rule-based and tuned to the sample sets.** It is for deterministic CI and guardrail checks, not a production evaluator.
+- **PII redaction** covers email and phone patterns in logs and eval output. Production use should also redact before model calls.
+- **KB coverage is thin**, which is the main reason routine tickets are routed rather than auto-answered.
+- The older `eval/results/benchmark_30-gpt-4o-mini-2026-10-22.json` is kept for historical comparison; use the mode-aware `-live-` file for the calibrated rerun.
+
+## Production rollout plan
+
+1. **Shadow mode with human approval.** The agent proposes; humans decide.
+2. **Capture corrections** as labeled examples (ticket, model output, corrected action/urgency, reason), split by time and customer to avoid leakage.
+3. **Calibrate confidence** on a held-out labeled set and enable auto-response only for categories with measured precision above 99% and zero missed critical cases.
+4. **Promote** only with complete critical-case recall and stable p95 latency and cost.
+5. **Monitor:** escalation recall, action precision, fallback rate, tool success, schema/policy failure rate, p50/p95 latency, tokens, cost, and human disagreement rate.
+
+Cost levers: concise KB summaries, prompt caching, and a two-stage funnel (cheap filter model, expert review only for riskier tickets). Live runs record prompt/completion tokens, calculated cost, and a 10,000-tickets/day projection in `eval/results/`.
+
+## Roadmap
+
+If given one more week, in priority order:
+
+1. Human-reviewed benchmark with legal/security and Thai-language edge cases, evaluated on a held-out split with repeated live runs.
+2. Replace broad keyword rules with word-boundary, field-scoped checks (ticket text only for trigger detection), with property tests.
+3. Expand KB coverage and add semantic retrieval with reranking so more routine tickets can be auto-answered safely.
+4. Live-mode budget guardrail (token/cost cap) and structured JSONL telemetry with daily summaries.
+5. Pre-model PII redaction, and a dashboard comparing live and offline runs by urgency, action, and fallback rate.
+
+## Testing and CI
+
+```bash
+python -m pytest -q                        # full suite (53 tests at last count)
+python -m pytest tests/test_guardrails.py -q
+```
+
+`.github/workflows/pytest.yml` runs on pushes to `main`/`master` and on pull requests, using Python 3.11:
+
+```yaml
+- run: python -m pip install -e ".[dev]"
+- run: python -m pytest -q
+- run: python -m ruff check app eval tests
+- run: python -m mypy --strict app
+- run: python -m eval.run_eval --file eval/sample_eval.json --mode offline --fail-on-critical --no-write
+```
+
+Tests cover tool calls, guardrails, parsing, fallback behavior, and the CLI.
 
 ## Telemetry and privacy
 
-This project includes lightweight telemetry and PII redaction to support safer production usage:
+- `app/telemetry/redaction.py` masks email and phone-style data before logging or eval output.
+- `app/telemetry/metrics.py` records decisions, errors, and fallback events; failures are logged without raw sensitive data.
+- Per-run metrics: latency, prompt/completion/total tokens, tool calls, LLM calls, cost, and projected daily cost.
 
-- `app/telemetry/redaction.py` removes or masks email/phone-style information before logging or eval output
-- `app/telemetry/metrics.py` records basic decisions, errors, and fallback events
-- Safe fallback and model/tool failures are logged without exposing raw sensitive data
-
-This is a foundational step toward responsible production operations. Real-world deployments should also consider export sinks, retention policies, and cost budgets for live LLM usage.
+Real deployments should add export sinks, retention policies, cost budgets, and redaction before model calls.
 
 ## Docker
 
-There is a Dockerfile and a docker-compose.yml for containerized runs.
-
-Build the image:
-
 ```bash
 docker build -t support-triage-agent .
-```
 
-Run offline (mount tickets folder):
+# Offline
+docker run --rm -v "${PWD}/tickets:/app/tickets:ro" support-triage-agent \
+  --ticket-file /app/tickets/sample_ticket.json --mode offline
 
-```bash
-docker run --rm -v "${PWD}/tickets:/app/tickets:ro" support-triage-agent --ticket-file /app/tickets/sample_ticket.json --mode offline
-```
+# Live
+docker run --rm -e OPENAI_API_KEY=$OPENAI_API_KEY -v "${PWD}/tickets:/app/tickets:ro" support-triage-agent \
+  --ticket-file /app/tickets/sample_ticket.json --mode live
 
-Run live (with API key):
-
-```bash
-docker run --rm -e OPENAI_API_KEY=$OPENAI_API_KEY -v "${PWD}/tickets:/app/tickets:ro" support-triage-agent --ticket-file /app/tickets/sample_ticket.json --mode live
-```
-
-Compose quick start:
-
-```bash
+# Compose
 docker compose up --build
-```
-
-Override compose command for ad-hoc runs:
-
-```bash
 docker compose run --rm triage -- --ticket-file /app/tickets/other_ticket.json --mode offline
 ```
 
 ## Command reference
 
-| Command | What it does | Example |
-|---|---|---|
-| Run CLI (offline) | Run triage on a JSON ticket using the deterministic local mock | `python -m app.cli.main --ticket-file tickets/sample_ticket.json --mode offline --pretty` |
-| Run CLI (live) | Run triage using OpenAI (requires OPENAI_API_KEY) | `python -m app.cli.main --ticket-file tickets/sample_ticket.json --mode live --pretty` |
-| Install deps | Install package and test tools locally | `python -m pip install -e . && python -m pip install pytest` |
-| Run tests | Execute the unit test suite | `python -m pytest -q` |
-| Eval metrics | Compute quality metrics against gold labels | `python -m eval.run_eval --file eval/sample_eval.json --mode offline` |
-| Docker build | Build the container image | `docker build -t support-triage-agent .` |
-| Docker run (offline) | Run the image in offline mode | `docker run --rm -v "${PWD}/tickets:/app/tickets:ro" support-triage-agent --ticket-file /app/tickets/sample_ticket.json --mode offline` |
-| Docker run (live) | Run the image in live mode | `docker run --rm -e OPENAI_API_KEY=$OPENAI_API_KEY -v "${PWD}/tickets:/app/tickets:ro" support-triage-agent --ticket-file /app/tickets/sample_ticket.json --mode live` |
-| Docker Compose up | Build and run the default service | `docker compose up --build` |
-| Docker Compose run | Run a one-off command inside the container | `docker compose run --rm triage -- --ticket-file /app/tickets/other_ticket.json --mode offline` |
+| Task | Command |
+|---|---|
+| Install | `python -m pip install -e ".[dev]"` |
+| Triage (offline) | `python -m app.cli.main --ticket-file tickets/sample_ticket.json --mode offline --pretty` |
+| Triage (live) | `python -m app.cli.main --ticket-file tickets/sample_ticket.json --mode live --pretty` |
+| Live demo | `make demo-live` |
+| Tests | `python -m pytest -q` |
+| Lint / types | `python -m ruff check app eval tests` / `python -m mypy --strict app` |
+| Eval (offline) | `python -m eval.run_eval --file eval/benchmark_30.json --mode offline --no-write` |
+| Eval (live) | `python -m eval.run_eval --file eval/benchmark_30.json --mode live --model gpt-4o-mini` |
+| Eval (assignment) | `make eval-assignment` |
 
 ## Project structure
 
 ```text
 app/
-  agent/
-  cli/
-  eval/
-  guardrails/
-  llm/
-  models/
+  agent/        orchestrator loop, retries, fallback
+  cli/          JSON CLI entry point
+  eval/         eval metrics
+  guardrails/   schema validator, policy guardrails
+  llm/          OpenAI adapter, offline mock
+  models/       ticket and decision models, JSON schema
   prompts/
-  telemetry/
-  tools/
-
+  telemetry/    redaction, metrics
+  tools/        customer history, KB, service status
 eval/
   run_eval.py
-  sample_eval.json
-
+  sample_eval.json            15-ticket smoke set
+  benchmark_30.json           30-ticket benchmark
+  assignment_origin_eval.json 3 supplied tickets
+  results/                    saved per-case run outputs
+tickets/                      sample tickets and category batches
 tests/
+.github/workflows/pytest.yml
+Dockerfile, docker-compose.yml, Makefile, .env.example
 ```
-
-## Workflow diagram
-
-```mermaid
-flowchart TD
-   A([Incoming Ticket]) --> B[Normalize Ticket]
-   B --> C[Tool lookup: customer history + KB]
-   C --> D[LLM triage decision]
-   D --> E[Schema validation]
-   E --> F[Policy guardrails]
-   F -->|Pass| G[Return triage result]
-   F -->|Fail| H[Retry or safe fallback]
-   H --> I[Return conservative fallback decision]
-```
-
-## Notes
-
-- The agent loop is orchestration-based: it gathers tool context, then generates a structured decision, then validates that decision before returning it.
-- Invalid JSON, invalid tool requests, generation failures, schema issues, and policy issues trigger retries and then a deterministic fallback.
-- The CLI is intentionally read-only and does not directly reply to customers or trigger external workflows.
-- Offline mode is ideal for CI, local testing, and reproducible evaluation.
-- The project is designed to be easy to extend as more routing rules, risk policies, or tool integrations are added.
-
-## Roadmap hardening summary
-
-This project follows a conservative orchestration architecture instead of a full agent framework because the main requirement is reliable safety under real-world support traffic. We keep a small custom control loop (normalize ticket → tool context → LLM → schema validation → policy guardrails → fallback) because it gives us deterministic ordering, easier debugging, and clear points for retry/fallback logic. The trade-off is that it is less declarative than a framework-based workflow, but the safety and auditability gains are substantial for triage systems dealing with high-risk customer issues.
-
-We also separate the concerns between the tool layer, LLM adapter, schema validator, and policy guardrail so the system can be extended without rewriting the entire pipeline. This is easier to reason about than a single monolithic prompt or a highly abstract agent framework when the application needs robust compliance behavior.
-
-Benchmarks and evidence:
-
-- Local deterministic suite: 53 tests passing (`pytest -q`)
-- Guardrail and schema tests: included in the project suite
-- Offline benchmark: deterministic mock and evaluation runner available via `eval/run_eval.py`
-- Live benchmark: run `make demo-live` or `python -m eval.run_eval --file eval/benchmark_30.json --mode live`; each run records expected and actual outcomes plus latency and token usage under `eval/results/`.
-
-Cost and latency notes:
-
-- For a live OpenAI run, the code tracks the task flow and logs timestamps via telemetry. The exact cost per ticket depends on prompt length, context size, validation retries, and the model selected.
-- The project uses `gpt-4o-mini` as the default live model because it offers a strong balance of quality, latency, and cost for a support-routing workflow. It is smaller and cheaper than larger reasoning models, while still handling structured extraction and compliance checking well.
-- A rough daily estimate at 10,000 tickets/day depends on the chosen model, average token count, and retry rate. For a text-heavy enterprise support workload, cost can be sharply reduced with prompt caching, concise KB summaries, and a two-stage funnel: cheap initial filtering model → expert review only for riskier tickets.
-
-Known limitations:
-
-- The offline mock is intentionally deterministic and is not a real production benchmark.
-- Live metrics remain environment-dependent and require a valid key, quota, and representative benchmark data.
-- PII redaction is stronger than the original version, but production deployments should still apply policy-based redaction before model calls, not only at logging time.
-- A larger, human-reviewed benchmark is still needed for strong public claims about accuracy and risk.
-
-If one more week were available, the next priorities would be:
-
-1. Add a richer human-reviewed benchmark with legal/security and Thai-language edge cases.
-2. Measure cost and latency per ticket automatically in live mode and export daily summaries.
-3. Add a prompt-caching and model-routing layer to reduce cost while preserving safety.
-4. Expand the policy suite and property tests for more edge cases and fail-fast validation.
-5. Add a reporting dashboard for live and offline benchmark comparisons by urgency/action and fallback rate.
-
-## Future improvements
-
-- Add a richer benchmark dataset with human-reviewed edge cases and legal/security examples
-- Add a live-mode cost guardrail to cap tokens or budget before execution
-- Add structured JSONL telemetry and a reporting layer for production monitoring
-- Add more safety policy mapping and rule explanation for internal compliance reviews
-- Expand KB grounding with semantic retrieval and reranking for higher-quality answers
-- **Limitations:** Offline mode uses a deterministic mock LLM; live performance depends on model quality, KB coverage, and external tool availability.
