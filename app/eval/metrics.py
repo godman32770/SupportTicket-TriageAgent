@@ -71,12 +71,31 @@ def evaluate_triage(predictions: list[dict[str, Any]], gold: list[dict[str, Any]
     if len(predictions) != len(gold):
         raise ValueError("predictions and gold lengths must match.")
 
-    actual_urgency = [str(item.get("urgency", "")) for item in gold]
     predicted_urgency = [str(item.get("urgency", "")) for item in predictions]
+    expected_urgency = [
+        item.get("urgency", "")
+        if isinstance(item.get("urgency", ""), list)
+        else [item.get("urgency", "")]
+        for item in gold
+    ]
+    primary_urgency = [
+        str(labels[0]) if labels else ""
+        for labels in expected_urgency
+    ]
     actual_actions = [str(item.get("action", "")) for item in gold]
     predicted_actions = [str(item.get("action", "")) for item in predictions]
-    actual_pairs = list(zip(actual_urgency, actual_actions, strict=False))
-    predicted_pairs = list(zip(predicted_urgency, predicted_actions, strict=False))
+    urgency_matches = [
+        prediction in labels
+        for prediction, labels in zip(predicted_urgency, expected_urgency, strict=False)
+    ]
+    action_matches = [
+        prediction == expected
+        for prediction, expected in zip(predicted_actions, actual_actions, strict=False)
+    ]
+    pair_matches = [
+        urgency_ok and action_ok
+        for urgency_ok, action_ok in zip(urgency_matches, action_matches, strict=False)
+    ]
     fallback_predictions = [
         prediction
         for prediction in predictions
@@ -88,9 +107,9 @@ def evaluate_triage(predictions: list[dict[str, Any]], gold: list[dict[str, Any]
         item for item in predictions if str(item.get("action", "")).lower() == "auto_respond"
     ]
     result: dict[str, Any] = {
-        "urgency_accuracy": accuracy_score(actual_urgency, predicted_urgency),
-        "action_accuracy": accuracy_score(actual_actions, predicted_actions),
-        "overall_accuracy": accuracy_score(actual_pairs, predicted_pairs),
+        "urgency_accuracy": _safe_mean(urgency_matches),
+        "action_accuracy": _safe_mean(action_matches),
+        "overall_accuracy": _safe_mean(pair_matches),
         "fallback_rate": _safe_mean([1.0 if prediction in fallback_predictions else 0.0 for prediction in predictions]),
         "kb_grounding_rate": _safe_mean(
             _has_kb_evidence(item.get("kb_summary")) for item in auto_respond_predictions
@@ -102,7 +121,8 @@ def evaluate_triage(predictions: list[dict[str, Any]], gold: list[dict[str, Any]
         result[f"{action}_precision"] = precision
         result[f"{action}_recall"] = recall
     escalation_recall = _precision_recall(
-        ["escalate" if item in {"high", "critical"} else "other" for item in actual_urgency],
+        ["escalate" if any(level in {"high", "critical"} for level in labels) else "other"
+         for labels in expected_urgency],
         ["escalate" if item == "escalate_to_human" else "other" for item in predicted_actions],
         "escalate",
     )[1]
@@ -110,14 +130,14 @@ def evaluate_triage(predictions: list[dict[str, Any]], gold: list[dict[str, Any]
     levels = ("low", "medium", "high", "critical")
     result["urgency_confusion_matrix"] = {
         actual: {
-            predicted: sum(a == actual and p == predicted for a, p in zip(actual_urgency, predicted_urgency))
+            predicted: sum(a == actual and p == predicted for a, p in zip(primary_urgency, predicted_urgency))
             for predicted in levels
         }
         for actual in levels
     }
     result["critical_cases_missed"] = float(sum(
-        expected in {"high", "critical"} and prediction != "escalate_to_human"
-        for expected, prediction in zip(actual_urgency, predicted_actions)
+        any(level in {"high", "critical"} for level in expected) and prediction != "escalate_to_human"
+        for expected, prediction in zip(expected_urgency, predicted_actions)
     ))
 
     for field in ("product", "issue_type", "sentiment", "language", "intents"):

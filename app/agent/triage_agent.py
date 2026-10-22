@@ -209,6 +209,26 @@ def calibrate_decision(response: dict[str, Any], ticket: SupportTicket, kb_summa
     return response
 
 
+def _decision_reasoning(decision: Mapping[str, Any]) -> str:
+    urgency = str(decision.get("urgency", ""))
+    action_descriptions = {
+        "auto_respond": "assigned to an automated response",
+        "route_to_specialist": "routed to a specialist",
+        "escalate_to_human": "escalated to a human",
+    }
+    action = action_descriptions.get(str(decision.get("action", "")))
+    intent_values = decision.get("intents")
+    if (
+        urgency not in {"low", "medium", "high", "critical"}
+        or action is None
+        or not isinstance(intent_values, list)
+        or not intent_values
+    ):
+        return "The triage decision is pending schema validation."
+    intents = ", ".join(str(intent).replace("_", " ") for intent in intent_values)
+    return f"The final decision classifies this ticket as {urgency} urgency for {intents} and is {action}."
+
+
 class TriageAgent:
     def __init__(
         self,
@@ -441,8 +461,8 @@ class TriageAgent:
                 not response["kb_summary"] or "no matching kb" in response["kb_summary"].lower()
             ):
                 response["action"] = "route_to_specialist"
-                response["reasoning"] = f"{response.get('reasoning', '')} Auto-response was changed to specialist routing because no KB evidence was available.".strip()
                 response.setdefault("safety_checks", []).append("ungrounded auto-response rewritten")
+            response["reasoning"] = _decision_reasoning(response)
             schema_issues = self.schema_validator.validate(response)
             guardrail_issues = (
                 self.policy_guardrail.validate({**response, "description": ticket.description}) if not schema_issues else []
@@ -492,6 +512,7 @@ class TriageAgent:
                 "safety_checks": ["fallback guardrail applied", "forced human escalation"],
             }
 
+        decision["reasoning"] = _decision_reasoning(decision)
         result = TriageDecision.model_validate(decision)
         usage = getattr(self.llm_client, "last_usage", {})
         self.last_run_metrics = {

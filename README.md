@@ -11,12 +11,12 @@ A conservative support-ticket triage agent. An LLM proposes a decision (urgency,
 | | |
 |---|---|
 | Input | JSON ticket (single object or array) via CLI or Python |
-| Output | Validated JSON: urgency, product, issue type, sentiment, language, intents, action, confidence, reasoning, history/KB summaries, safety checks |
+| Output | Validated JSON: urgency, product, issue type, sentiment, language, intents, action, confidence, final-decision summary, history/KB summaries, safety checks |
 | Tools (read-only) | Customer history, knowledge base, service status |
 | Modes | `offline` (deterministic mock, no key, used in CI) and `live` (OpenAI, native tool calls) |
 | Safety | Strict schema validation + 10 policy guardrails + bounded retries + guaranteed fallback to human escalation |
 | Quality gates (CI) | pytest, Ruff, `mypy --strict`, critical-case eval gate |
-| Latest live result | `gpt-4o-mini`, 30-ticket benchmark: 0.97 urgency, 0.93 action, **0 critical cases missed** (see [Results](#results)) |
+| Latest live result | `gpt-4o-mini`, 30-ticket benchmark: 0.97 urgency, 0.87 action, **0 high/critical cases not escalated**; held-out `newticket.json`: 0.50 / 0.55 / 0.40 urgency/action/overall (see [Results](#results)) |
 
 ## Table of contents
 
@@ -77,7 +77,7 @@ Output (offline mode; `reasoning` and `safety_checks` are also emitted but trimm
 }
 ```
 
-The customer flags the issue as urgent, and the agent returns `high` urgency with `escalate_to_human` instead of auto-responding.
+The customer flags the issue as urgent, and the agent returns `high` urgency with `escalate_to_human` instead of auto-responding. Even if a model proposed `auto_respond` here, the `account_access_escalate` guardrail would reject it, because "cannot log in" is a covered phrasing (regression-tested).
 
 **Live mode** (needs an OpenAI key):
 
@@ -111,7 +111,7 @@ flowchart TD
 
 1. **Normalize** the ticket into a typed model.
 2. **LLM loop.** The live model may request a registered tool (`get_customer_history`, `search_kb`, `check_service_status`) or submit its answer with the forced final `submit_triage` call. Each tool may be called once, with at most three calls per ticket; unknown or repeated tool requests are rejected.
-3. **Validate.** Output must pass strict schema validation, then the policy guardrails. Guardrails do not rewrite decisions: a violating decision is rejected, and the violation text is returned to the model as feedback for the retry.
+3. **Validate.** Output must pass strict schema validation, then the policy guardrails. A violating decision is rejected and the violation text is returned to the model as feedback for the retry. In addition, deterministic calibration steps can adjust a decision before it is returned; these are recorded in `safety_checks` (for example `ungrounded auto-response rewritten`, `account access override applied`, `billing risk calibration applied`), so every override is auditable in the saved results. The application generates `reasoning` after these adjustments from the final urgency, intent, and action; model- or tool-authored explanations are not returned.
 4. **Fall back.** On parse errors, schema or policy failures, tool failures, or exhausted retries the agent returns a deterministic, low-confidence `escalate_to_human` decision. If even that fails validation, it is replaced with a forced critical escalation.
 
 Code map:
@@ -135,7 +135,7 @@ Guardrails are conservative by design and prioritize safety over convenience. Al
 
 | ID | Triggered when | Decision is rejected unless |
 |---|---|---|
-| `account_access_escalate` | Locked out, cannot sign in, MFA code not working, etc. | action is `escalate_to_human` |
+| `account_access_escalate` | Locked out, cannot access, MFA code not working, or cannot / can't / unable to sign in, log in, or login | action is `escalate_to_human` |
 | `billing_no_auto` | Billing dispute, chargeback, unresolved payment, or unpaid invoices | action is not `auto_respond` |
 | `enterprise_outage_escalate` | Enterprise product plus outage / down / service unavailable | action is `escalate_to_human` **and** urgency is `critical` |
 | `sec_escalate` | Security, breach, data loss, legal threat, or lawsuit signal | action is not `auto_respond`, and urgency is at least `high` or the action is `escalate_to_human` |
@@ -154,42 +154,57 @@ Plus general rules: valid urgency and action values, required product/issue type
 
 All numbers come from `python -m eval.run_eval`. Per-case results are written to `eval/results/<fixture>-<mode>-<model>-<date>.json`, so offline, live, benchmark, and assignment runs never overwrite each other.
 
-| Evaluation | N | Urgency acc. | Action acc. | Overall acc. | Critical missed |
+| Evaluation | N | Urgency acc. | Action acc. | Overall acc. | High/critical not escalated |
 |---|---:|---:|---:|---:|---:|
 | Majority baseline (always `low` / `escalate_to_human`) | 30 | 0.33 | 0.40 | 0.33 | 7 |
 | Offline mock, smoke set | 15 | 0.87 | 0.87 | 0.87 | 0 |
 | Offline mock, 30-ticket benchmark (calibrated) | 30 | 1.00 | 1.00 | 1.00 | 0 |
-| **Live `gpt-4o-mini`, 30-ticket benchmark (2026-10-22, calibrated)** | 30 | 0.97 | 0.93 | 0.90 | 0 |
+| **Live `gpt-4o-mini`, 30-ticket benchmark (2026-10-22)** | 30 | 0.97 | 0.87 | 0.83 | 0 |
+| **Held-out live `gpt-4o-mini` (`newticket.json`, 2026-10-22)** | 20 | 0.50 | 0.55 | 0.40 | 5 |
 | Assignment-origin tickets, offline | 3 | 1.00 | 1.00 | 1.00 | 0 |
 | Assignment-origin tickets, live `gpt-4o-mini` | 3 | 1.00 | 1.00 | 1.00 | 0 |
 
 `overall_accuracy` is the urgency/action pair metric and excludes metadata fields.
 
-**Live run detail (30 tickets, one model/date snapshot):**
+`newticket.json` is a separate 20-ticket held-out set with no ticket-ID overlap with the 30-ticket benchmark. Its annotations may list multiple acceptable urgency levels; scoring accepts any listed level. It was not used for offline calibration or tuning. The live held-out results are reported separately and should not be used to tune this score. `High/critical not escalated` counts gold high- or critical-urgency cases whose predicted action was not `escalate_to_human`.
+
+**Live run detail (30-ticket benchmark, 2026-10-22):**
 
 | Metric | Value |
 |---|---|
 | Escalation recall | 1.00 |
 | Fallback rate | 0.00 |
-| Latency p50 / p95 | 6,076 ms / 7,552 ms |
+| Latency p50 / p95 | 6,608 ms / 8,223 ms |
 | Model calls per ticket (p50) | 4 |
-| Projected cost | about $1.66 per 10,000 tickets |
-| Product, issue type, sentiment, language accuracy | 1.00 each |
-| Intent accuracy | 0.97 |
+| Projected cost | about $1.71 per 10,000 tickets |
+| Intent accuracy | 0.93 |
 
 Full per-case output: `eval/results/benchmark_30-live-gpt-4o-mini-2026-10-22.json`.
 
-**Error analysis.** The four live misses were all on the safe side except one scoring miss:
-- Two routine requests were *routed* instead of auto-responded (conservative; KB coverage for routine password, billing, and account-setting questions is too thin to ground an auto-reply).
-- One payment-due-date request was scored `low` instead of `medium`.
-- One routine MFA-settings ticket received an extra `service_outage` intent.
+**Held-out live run detail (20 tickets, 2026-10-22):**
+
+| Metric | Value |
+|---|---|
+| Urgency / action / overall accuracy | 0.50 / 0.55 / 0.40 |
+| High/critical cases not escalated | 5 |
+| Fallback rate | 0.00 |
+| Latency p50 / p95 | 6,553 ms / 8,080 ms |
+| Model calls per ticket (p50) | 4 |
+| Projected cost | about $1.71 per 10,000 tickets |
+
+This low score is a warning that the current model and policy do not generalize well to this held-out set. Inspect its per-case output before any future calibration, and preserve this score as the untuned baseline: `eval/results/newticket-live-gpt-4o-mini-2026-10-22.json`.
+
+Most held-out errors involved privacy/security incidents or technical and broad-impact issues (including GDPR erasure, cross-tenant exposure, production API limits, integrations, accessibility, and performance) being under-triaged as routine, while two prompt-injection tickets were assigned unnecessarily critical urgency.
 
 **How to read these numbers.** Be careful with the 1.00 rows:
 - The 30-ticket benchmark is synthetic and was used to calibrate the offline mock and policy rules, so offline 1.00 shows the rules fit that set, not that they generalize.
-- The live rerun happened after policy changes informed by earlier failures, so it is also not a clean held-out test.
+- The live benchmark was rerun after policy changes informed by earlier failures, so it is not a clean held-out test. Its current snapshot is 0.97 urgency / 0.87 action / 0.83 overall.
+- The separate held-out live set scored 0.50 urgency / 0.55 action / 0.40 overall, with five gold high/critical cases not escalated. Do not use this set to tune and then continue calling it held out.
 - The 15-ticket set is a CI smoke test; the 3-ticket assignment set cannot support any accuracy claim.
 - `fallback_rate` matters alongside `safety_policy_pass_rate`: a 1.00 pass rate can hide policy failures that were silently replaced by fallback (the smoke set has a 0.13 fallback rate).
 - Labels are project annotations, not independently audited ground truth.
+- Some action accuracy comes from deterministic overrides, not the model alone. Cases in the saved live results carry `safety_checks` such as `ungrounded auto-response rewritten` and `account access override applied`.
+- Live benchmark decisions, metrics, and reasoning were regenerated together on 2026-10-22. The `reasoning` field is deterministically generated from the final decision and is not part of the scored fields.
 
 The offline baseline run on the smoke set also reports `kb_grounding_rate` 1.00, `kb_hit_rate` 0.47, `safety_policy_pass_rate` 1.00, and 1.00 on product, issue type, sentiment, language, and intents accuracy.
 
@@ -202,6 +217,7 @@ python -m eval.run_eval --file eval/benchmark_30.json --mode offline --no-write
 
 # Live (needs OPENAI_API_KEY; costs money; results vary by model and run)
 python -m eval.run_eval --file eval/benchmark_30.json --mode live --model gpt-4o-mini
+python -m eval.run_eval --file newticket.json --mode live --model gpt-4o-mini
 make eval-assignment
 ```
 
@@ -212,6 +228,7 @@ Fixtures:
 | `eval/sample_eval.json` | 15 | CI smoke benchmark |
 | `eval/benchmark_30.json` | 30 | Stronger offline and live stress test |
 | `eval/assignment_origin_eval.json` | 3 | The three supplied Enterprise, Free, and Pro tickets; source intents preserved, `gold` mapped to this project's taxonomy |
+| `newticket.json` | 20 | Held-out live evaluation; not used for calibration or tuning |
 
 The CLI also accepts a JSON array, so you can triage whole batches (for example `tickets/batch_security.json`) and diff outputs by hand.
 
@@ -229,13 +246,14 @@ Metrics reported: `urgency_accuracy`, `action_accuracy`, `overall_accuracy`, `fa
 
 ## Limitations
 
-- **Keyword-based policy matching** can miss unusual phrasing and can over-trigger on generic words. Guardrails also read model-written fields (reasoning, summaries), not just the ticket text.
+- **Keyword-based policy matching** can still miss unusual phrasing and can over-trigger on generic words. Login-failure phrasings ("cannot / can't / unable to log in, login, sign in") are now covered, and the fallback matches urgency keywords on word boundaries (so "download" is not "down"); both have regression tests. Guardrails still read model-written fields (reasoning, summaries), not only the ticket text, which remains a known weakness.
 - **Model confidence is uncalibrated**, so the 0.75 auto-respond threshold is a heuristic.
 - **Small, synthetic, self-annotated benchmarks.** Human-reviewed data is missing, and the 30-ticket set is too small for a production claim. The live score is one model/date snapshot subject to model drift and cost.
 - **The offline mock is rule-based and tuned to the sample sets.** It is for deterministic CI and guardrail checks, not a production evaluator.
 - **PII redaction** covers email and phone patterns in logs and eval output. Production use should also redact before model calls.
-- **KB coverage is thin**, which is the main reason routine tickets are routed rather than auto-answered.
-- The older `eval/results/benchmark_30-gpt-4o-mini-2026-10-22.json` is kept for historical comparison; use the mode-aware `-live-` file for the calibrated rerun.
+- **KB coverage is thin**, which is the main reason routine tickets are routed rather than auto-answered. In several saved live cases the model skipped tools entirely, leaving history and KB summaries empty.
+- **`reasoning` text can contradict the decision** (see [Results](#results)). It is informational only and not scored; fixing it needs a prompt or output-order change and a live re-evaluation.
+- The older `eval/results/benchmark_30-gpt-4o-mini-2026-10-22.json` is kept for historical comparison; use the mode-aware `-live-` file for the latest live run.
 
 ## Production rollout plan
 
@@ -252,15 +270,16 @@ Cost levers: concise KB summaries, prompt caching, and a two-stage funnel (cheap
 If given one more week, in priority order:
 
 1. Human-reviewed benchmark with legal/security and Thai-language edge cases, evaluated on a held-out split with repeated live runs.
-2. Replace broad keyword rules with word-boundary, field-scoped checks (ticket text only for trigger detection), with property tests.
-3. Expand KB coverage and add semantic retrieval with reranking so more routine tickets can be auto-answered safely.
-4. Live-mode budget guardrail (token/cost cap) and structured JSONL telemetry with daily summaries.
-5. Pre-model PII redaction, and a dashboard comparing live and offline runs by urgency, action, and fallback rate.
+2. Scope trigger detection to ticket text only (it currently also reads model-written fields) and add property tests. Already done: login-failure phrasings and word-boundary fallback matching, with regression tests in `tests/test_login_variants_and_fallback.py`.
+3. Make `reasoning` consistent with the final decision (generate it after the decision, or constrain it in the prompt) and re-run the live benchmark.
+4. Expand KB coverage and add semantic retrieval with reranking so more routine tickets can be auto-answered safely.
+5. Live-mode budget guardrail (token/cost cap) and structured JSONL telemetry with daily summaries.
+6. Pre-model PII redaction, and a dashboard comparing live and offline runs by urgency, action, and fallback rate.
 
 ## Testing and CI
 
 ```bash
-python -m pytest -q                        # full suite (53 tests at last count)
+python -m pytest -q                        # full suite (also run in CI)
 python -m pytest tests/test_guardrails.py -q
 ```
 
@@ -274,7 +293,7 @@ python -m pytest tests/test_guardrails.py -q
 - run: python -m eval.run_eval --file eval/sample_eval.json --mode offline --fail-on-critical --no-write
 ```
 
-Tests cover tool calls, guardrails, parsing, fallback behavior, and the CLI.
+Tests cover tool calls, guardrails, parsing, fallback behavior, and the CLI. `tests/test_login_variants_and_fallback.py` holds regression tests for login-failure phrasings and word-boundary fallback matching.
 
 ## Telemetry and privacy
 

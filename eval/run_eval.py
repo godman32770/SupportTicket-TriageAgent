@@ -23,6 +23,49 @@ def _load_payload(path: str) -> dict[str, Any]:
         return payload
     if isinstance(payload, dict) and "predictions" in payload and "gold" in payload:
         return payload
+    if isinstance(payload, list):
+        tickets: list[dict[str, Any]] = []
+        gold: list[dict[str, Any]] = []
+        for index, item in enumerate(payload):
+            if not isinstance(item, dict) or not isinstance(item.get("ticket"), dict):
+                raise TypeError(f"Held-out ticket {index + 1} must contain a ticket object.")
+            source = item["ticket"]
+            customer = source.get("customer")
+            messages = source.get("messages")
+            expected = item.get("expected")
+            if not isinstance(customer, dict) or not isinstance(messages, list) or not messages:
+                raise ValueError(f"Held-out ticket {index + 1} must contain customer data and messages.")
+            if not isinstance(expected, dict) or not isinstance(expected.get("urgency"), list):
+                raise TypeError(f"Held-out ticket {index + 1} must contain an allowed urgency list.")
+            if not isinstance(expected.get("action"), str):
+                raise TypeError(f"Held-out ticket {index + 1} must contain an expected action.")
+            message_text = [
+                message.get("text")
+                for message in messages
+                if isinstance(message, dict) and isinstance(message.get("text"), str)
+            ]
+            if len(message_text) != len(messages):
+                raise ValueError(f"Held-out ticket {index + 1} contains an invalid message.")
+            ticket_id = source.get("id")
+            customer_id = customer.get("id")
+            if not isinstance(ticket_id, str) or not isinstance(customer_id, str):
+                raise TypeError(f"Held-out ticket {index + 1} must have ticket and customer IDs.")
+            tickets.append({
+                "ticket_id": ticket_id,
+                "customer_id": customer_id,
+                "product": "support_platform",
+                "issue_type": "general_help",
+                "description": " ".join(message_text),
+                "metadata": {
+                    "customer_plan": customer.get("plan"),
+                    "customer_region": customer.get("region"),
+                    "customer_seats": customer.get("seats"),
+                },
+            })
+            gold.append({"urgency": expected["urgency"], "action": expected["action"]})
+        if not tickets:
+            raise ValueError("Held-out ticket file must not be empty.")
+        return {"tickets": tickets, "gold": gold}
     raise ValueError("Eval file must contain either 'tickets' + 'gold' or 'predictions' + 'gold'.")
 
 

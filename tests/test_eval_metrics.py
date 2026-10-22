@@ -85,3 +85,14 @@ def test_evaluate_triage_reports_optional_operational_metrics():
 def test_evaluate_triage_rejects_prediction_and_gold_length_mismatch():
     with pytest.raises(ValueError, match="lengths must match"):
         evaluate_triage([{"urgency": "low", "action": "auto_respond"}], [])
+
+
+def test_evaluate_triage_accepts_any_allowed_urgency_label():
+    result = evaluate_triage(
+        [{"urgency": "critical", "action": "escalate_to_human"}],
+        [{"urgency": ["high", "critical"], "action": "escalate_to_human"}],
+    )
+
+    assert result["urgency_accuracy"] == 1.0
+    assert result["action_accuracy"] == 1.0
+    assert result["overall_accuracy"] == 1.0

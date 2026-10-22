@@ -3,13 +3,13 @@
   "mode": "live",
   "metrics": {
     "urgency_accuracy": 0.9666666666666667,
-    "action_accuracy": 0.9333333333333333,
-    "overall_accuracy": 0.9,
+    "action_accuracy": 0.8666666666666667,
+    "overall_accuracy": 0.8333333333333334,
     "fallback_rate": 0.0,
     "kb_grounding_rate": 1.0,
     "auto_respond_precision": 1.0,
-    "auto_respond_recall": 0.8,
-    "route_to_specialist_precision": 0.8,
+    "auto_respond_recall": 0.6,
+    "route_to_specialist_precision": 0.6666666666666666,
     "route_to_specialist_recall": 1.0,
     "escalate_to_human_precision": 1.0,
     "escalate_to_human_recall": 1.0,
@@ -45,19 +45,19 @@
     "issue_type_accuracy": 1.0,
     "sentiment_accuracy": 1.0,
     "language_accuracy": 1.0,
-    "intents_accuracy": 0.9666666666666667,
-    "kb_hit_rate": 0.43333333333333335,
+    "intents_accuracy": 0.9333333333333333,
+    "kb_hit_rate": 0.4666666666666667,
     "safety_policy_pass_rate": 1.0,
-    "latency_p50_ms": 6076.06,
-    "latency_p95_ms": 7551.53,
+    "latency_p50_ms": 6607.77,
+    "latency_p95_ms": 8223.33,
     "latency_sample_count": 30.0,
-    "cost_usd_p50": 0.0001659,
-    "cost_usd_p95": 0.00025695,
+    "cost_usd_p50": 0.00017145,
+    "cost_usd_p95": 0.00025155,
     "cost_usd_sample_count": 30.0,
     "llm_calls_p50": 4.0,
     "llm_calls_p95": 4.0,
     "llm_calls_sample_count": 30.0,
-    "projected_daily_cost_usd_p50": 1.659
+    "projected_daily_cost_usd_p50": 1.7145
   },
   "cases": [
     {
@@ -97,20 +97,20 @@
         ],
         "action": "route_to_specialist",
         "confidence": 0.8,
-        "reasoning": "The customer is requesting help with a password reset, which is a routine issue with no immediate business impact. The knowledge base does not provide specific guidance, but this type of request typically falls under standard support procedures. Auto-response was changed to specialist routing because no KB evidence was available.",
+        "reasoning": "The final decision classifies this ticket as low urgency for login help and is routed to a specialist.",
         "customer_history_summary": "",
         "kb_summary": "",
         "safety_checks": [
           "ungrounded auto-response rewritten"
         ],
-        "latency_ms": 3653.2,
-        "prompt_tokens": 1163,
-        "completion_tokens": 134,
+        "latency_ms": 3813.43,
+        "prompt_tokens": 1195,
+        "completion_tokens": 102,
         "total_tokens": 1297,
         "tool_calls": 0,
         "llm_calls": 1,
-        "cost_usd": 0.00025485,
-        "projected_daily_cost_usd": 2.5485
+        "cost_usd": 0.00024045,
+        "projected_daily_cost_usd": 2.4045
       }
     },
     {
@@ -150,7 +150,7 @@
         ],
         "action": "escalate_to_human",
         "confidence": 0.85,
-        "reasoning": "The customer is experiencing a service outage with the mobile app. There are no prior issues reported by this customer, and the knowledge base suggests escalating to a specialist if the issue persists.",
+        "reasoning": "The final decision classifies this ticket as high urgency for login help and is escalated to a human.",
         "customer_history_summary": "No prior customer history found for C302.",
         "kb_summary": "Password reset flows are available; if MFA issues persist, escalate to specialist.",
         "safety_checks": [
@@ -158,14 +158,14 @@
           "No security threats detected",
           "account access override applied"
         ],
-        "latency_ms": 7551.53,
-        "prompt_tokens": 550,
-        "completion_tokens": 139,
-        "total_tokens": 689,
+        "latency_ms": 9705.81,
+        "prompt_tokens": 547,
+        "completion_tokens": 147,
+        "total_tokens": 694,
         "tool_calls": 3,
         "llm_calls": 4,
-        "cost_usd": 0.0001659,
-        "projected_daily_cost_usd": 1.659
+        "cost_usd": 0.00017025,
+        "projected_daily_cost_usd": 1.7025
       }
     },
     {
@@ -205,7 +205,7 @@
         ],
         "action": "escalate_to_human",
         "confidence": 0.85,
-        "reasoning": "The customer is experiencing a service outage, and while there are no confirmed platform-wide incidents, the knowledge base suggests escalating to a specialist if issues persist. The customer has no prior history, indicating this may be a new issue.",
+        "reasoning": "The final decision classifies this ticket as high urgency for login help and is escalated to a human.",
         "customer_history_summary": "No prior customer history found for C303.",
         "kb_summary": "Password reset flows are available; if MFA issues persist, escalate to specialist.",
         "safety_checks": [
@@ -213,14 +213,14 @@
           "No confirmed platform-wide issues",
           "account access override applied"
         ],
-        "latency_ms": 7316.88,
+        "latency_ms": 8118.86,
         "prompt_tokens": 547,
-        "completion_tokens": 150,
-        "total_tokens": 697,
+        "completion_tokens": 153,
+        "total_tokens": 700,
         "tool_calls": 3,
         "llm_calls": 4,
-        "cost_usd": 0.00017205,
-        "projected_daily_cost_usd": 1.7205
+        "cost_usd": 0.00017385,
+        "projected_daily_cost_usd": 1.7385
       }
     },
     {
@@ -259,24 +259,22 @@
         "intents": [
           "login_help"
         ],
-        "action": "auto_respond",
-        "confidence": 0.85,
-        "reasoning": "The customer is experiencing a service outage, and while there are no confirmed incidents, the issue may require specialized attention. The knowledge base suggests escalating if MFA issues persist, which aligns with the customer's situation.",
-        "customer_history_summary": "No prior customer history found for C304.",
-        "kb_summary": "Password reset flows are available; if MFA issues persist, escalate to specialist.",
+        "action": "route_to_specialist",
+        "confidence": 0.8,
+        "reasoning": "The final decision classifies this ticket as low urgency for login help and is routed to a specialist.",
+        "customer_history_summary": "",
+        "kb_summary": "",
         "safety_checks": [
-          "No prior incidents reported",
-          "No confirmed platform-wide issues",
-          "routine request calibration applied"
+          "ungrounded auto-response rewritten"
         ],
-        "latency_ms": 6525.49,
-        "prompt_tokens": 548,
-        "completion_tokens": 147,
-        "total_tokens": 695,
-        "tool_calls": 3,
-        "llm_calls": 4,
-        "cost_usd": 0.0001704,
-        "projected_daily_cost_usd": 1.704
+        "latency_ms": 2846.59,
+        "prompt_tokens": 1196,
+        "completion_tokens": 104,
+        "total_tokens": 1300,
+        "tool_calls": 0,
+        "llm_calls": 1,
+        "cost_usd": 0.0002418,
+        "projected_daily_cost_usd": 2.418
       }
     },
     {
@@ -316,21 +314,21 @@
         ],
         "action": "route_to_specialist",
         "confidence": 0.85,
-        "reasoning": "The customer is experiencing a service outage, and while there are no confirmed platform-wide incidents, the knowledge base suggests escalating to a specialist if issues persist. This indicates a need for further investigation.",
+        "reasoning": "The final decision classifies this ticket as medium urgency for login help and is routed to a specialist.",
         "customer_history_summary": "No prior customer history found for C305.",
         "kb_summary": "Password reset flows are available; if MFA issues persist, escalate to specialist.",
         "safety_checks": [
           "No prior incidents reported",
-          "No platform-wide incident confirmed"
+          "No security threats detected"
         ],
-        "latency_ms": 8260.26,
+        "latency_ms": 7561.95,
         "prompt_tokens": 547,
-        "completion_tokens": 144,
-        "total_tokens": 691,
+        "completion_tokens": 153,
+        "total_tokens": 700,
         "tool_calls": 3,
         "llm_calls": 4,
-        "cost_usd": 0.00016845,
-        "projected_daily_cost_usd": 1.6845
+        "cost_usd": 0.00017385,
+        "projected_daily_cost_usd": 1.7385
       }
     },
     {
@@ -370,20 +368,22 @@
         ],
         "action": "auto_respond",
         "confidence": 0.85,
-        "reasoning": "The customer is experiencing a service outage with the Safe product, which is confirmed by the lack of a platform-wide incident. Given the urgency and the need for specialized assistance, routing to a specialist is appropriate.",
+        "reasoning": "The final decision classifies this ticket as low urgency for login help and is assigned to an automated response.",
         "customer_history_summary": "No prior customer history found for C306.",
         "kb_summary": "Password reset flows are available; if MFA issues persist, escalate to specialist.",
         "safety_checks": [
+          "No prior incidents reported",
+          "No confirmed platform-wide issues",
           "routine request calibration applied"
         ],
-        "latency_ms": 6299.46,
-        "prompt_tokens": 547,
-        "completion_tokens": 136,
-        "total_tokens": 683,
+        "latency_ms": 8023.34,
+        "prompt_tokens": 548,
+        "completion_tokens": 154,
+        "total_tokens": 702,
         "tool_calls": 3,
         "llm_calls": 4,
-        "cost_usd": 0.00016365,
-        "projected_daily_cost_usd": 1.6365
+        "cost_usd": 0.0001746,
+        "projected_daily_cost_usd": 1.746
       }
     },
     {
@@ -424,20 +424,20 @@
         ],
         "action": "route_to_specialist",
         "confidence": 0.9,
-        "reasoning": "The customer reported being charged twice for the same invoice, which indicates a billing dispute that requires specialist attention. The sentiment is angry, suggesting frustration with the situation, and the issue is specific to billing, warranting a medium urgency classification.",
+        "reasoning": "The final decision classifies this ticket as medium urgency for billing dispute and is routed to a specialist.",
         "customer_history_summary": "",
         "kb_summary": "",
         "safety_checks": [
           "billing risk calibration applied"
         ],
-        "latency_ms": 2612.64,
-        "prompt_tokens": 1165,
-        "completion_tokens": 137,
-        "total_tokens": 1302,
+        "latency_ms": 2664.37,
+        "prompt_tokens": 1197,
+        "completion_tokens": 110,
+        "total_tokens": 1307,
         "tool_calls": 0,
         "llm_calls": 1,
-        "cost_usd": 0.00025695,
-        "projected_daily_cost_usd": 2.5695
+        "cost_usd": 0.00024555,
+        "projected_daily_cost_usd": 2.4555
       }
     },
     {
@@ -477,20 +477,20 @@
         ],
         "action": "route_to_specialist",
         "confidence": 0.8,
-        "reasoning": "The customer's inquiry about the payment due date is routine and does not indicate any immediate business impact. It falls under general support questions. Auto-response was changed to specialist routing because no KB evidence was available.",
+        "reasoning": "The final decision classifies this ticket as low urgency for billing dispute and is routed to a specialist.",
         "customer_history_summary": "",
         "kb_summary": "",
         "safety_checks": [
           "ungrounded auto-response rewritten"
         ],
-        "latency_ms": 2642.26,
-        "prompt_tokens": 1166,
-        "completion_tokens": 113,
-        "total_tokens": 1279,
+        "latency_ms": 3169.62,
+        "prompt_tokens": 1198,
+        "completion_tokens": 111,
+        "total_tokens": 1309,
         "tool_calls": 0,
         "llm_calls": 1,
-        "cost_usd": 0.0002427,
-        "projected_daily_cost_usd": 2.427
+        "cost_usd": 0.0002463,
+        "projected_daily_cost_usd": 2.463
       }
     },
     {
@@ -530,17 +530,17 @@
           "billing_dispute"
         ],
         "action": "route_to_specialist",
-        "confidence": 0.9,
-        "reasoning": "The customer is requesting a refund for a mistaken charge, which indicates a billing dispute. This issue is affecting the customer's financial situation, thus classified as medium urgency. The request does not indicate a broader service issue or security threat, but it requires specialist attention to resolve the billing concern.",
+        "confidence": 0.8,
+        "reasoning": "The final decision classifies this ticket as medium urgency for billing dispute and is routed to a specialist.",
         "customer_history_summary": "",
         "kb_summary": "",
         "safety_checks": [
           "billing risk calibration applied"
         ],
-        "latency_ms": 2597.98,
-        "prompt_tokens": 1164,
-        "completion_tokens": 146,
-        "total_tokens": 1310,
+        "latency_ms": 3129.93,
+        "prompt_tokens": 1196,
+        "completion_tokens": 138,
+        "total_tokens": 1334,
         "tool_calls": 0,
         "llm_calls": 1,
         "cost_usd": 0.0002622,
@@ -583,22 +583,21 @@
           "billing_dispute"
         ],
         "action": "route_to_specialist",
-        "confidence": 0.9,
-        "reasoning": "The customer is experiencing an issue with the renewal price being incorrect, which indicates a billing dispute that requires specialist attention. The sentiment is frustrated, suggesting the issue is significant to the customer, but it does not indicate an immediate business impact that would elevate the urgency to high or critical.",
+        "confidence": 0.8,
+        "reasoning": "The final decision classifies this ticket as medium urgency for billing dispute and is routed to a specialist.",
         "customer_history_summary": "",
         "kb_summary": "",
         "safety_checks": [
-          "billing risk calibration applied",
           "billing risk calibration applied"
         ],
-        "latency_ms": 6076.06,
-        "prompt_tokens": 604,
-        "completion_tokens": 139,
-        "total_tokens": 743,
+        "latency_ms": 2828.45,
+        "prompt_tokens": 1197,
+        "completion_tokens": 120,
+        "total_tokens": 1317,
         "tool_calls": 0,
-        "llm_calls": 2,
-        "cost_usd": 0.000174,
-        "projected_daily_cost_usd": 1.74
+        "llm_calls": 1,
+        "cost_usd": 0.00025155,
+        "projected_daily_cost_usd": 2.5155
       }
     },
     {
@@ -638,22 +637,22 @@
         ],
         "action": "route_to_specialist",
         "confidence": 0.85,
-        "reasoning": "The customer reported a service outage, and while there are no confirmed incidents, the issue may still require further investigation by a specialist.",
+        "reasoning": "The final decision classifies this ticket as medium urgency for billing dispute and is routed to a specialist.",
         "customer_history_summary": "No prior customer history found for C311.",
         "kb_summary": "Billing issues often require verification of recent charges, duplicate payments, and account status.",
         "safety_checks": [
-          "No prior incidents reported",
-          "No customer history available",
+          "No prior customer history",
+          "Service status not confirmed",
           "billing risk calibration applied"
         ],
-        "latency_ms": 6257.98,
+        "latency_ms": 7198.77,
         "prompt_tokens": 548,
-        "completion_tokens": 128,
-        "total_tokens": 676,
+        "completion_tokens": 159,
+        "total_tokens": 707,
         "tool_calls": 3,
         "llm_calls": 4,
-        "cost_usd": 0.000159,
-        "projected_daily_cost_usd": 1.59
+        "cost_usd": 0.0001776,
+        "projected_daily_cost_usd": 1.776
       }
     },
     {
@@ -691,22 +690,22 @@
         "intents": [
           "billing_dispute"
         ],
-        "action": "route_to_specialist",
-        "confidence": 0.8,
-        "reasoning": "The customer is seeking clarification on recent charges, which is a routine inquiry with no immediate business impact. The issue does not indicate any urgency or risk. Therefore, it is classified as low urgency and can be addressed with an auto-response. Auto-response was changed to specialist routing because no KB evidence was available.",
-        "customer_history_summary": "",
-        "kb_summary": "",
+        "action": "auto_respond",
+        "confidence": 0.85,
+        "reasoning": "The final decision classifies this ticket as low urgency for billing dispute and is assigned to an automated response.",
+        "customer_history_summary": "No prior customer history found for C312.",
+        "kb_summary": "Billing issues often require verification of recent charges, duplicate payments, and account status.",
         "safety_checks": [
-          "ungrounded auto-response rewritten"
+          "routine request calibration applied"
         ],
-        "latency_ms": 2900.49,
-        "prompt_tokens": 1165,
-        "completion_tokens": 134,
-        "total_tokens": 1299,
-        "tool_calls": 0,
-        "llm_calls": 1,
-        "cost_usd": 0.00025515,
-        "projected_daily_cost_usd": 2.5515
+        "latency_ms": 6426.01,
+        "prompt_tokens": 547,
+        "completion_tokens": 149,
+        "total_tokens": 696,
+        "tool_calls": 3,
+        "llm_calls": 4,
+        "cost_usd": 0.00017145,
+        "projected_daily_cost_usd": 1.7145
       }
     },
     {
@@ -744,20 +743,21 @@
         ],
         "action": "escalate_to_human",
         "confidence": 0.8,
-        "reasoning": "The customer reported a service outage, but there are no confirmed incidents on the platform. The lack of prior history suggests this may be an isolated issue. Routing to a specialist for further investigation is appropriate.",
-        "customer_history_summary": "No prior customer history found for C313.",
-        "kb_summary": "No matching KB entries found; use general support workflow.",
+        "reasoning": "The final decision classifies this ticket as critical urgency for service outage and is escalated to a human.",
+        "customer_history_summary": "",
+        "kb_summary": "",
         "safety_checks": [
+          "No safety concerns identified.",
           "content safety override applied"
         ],
-        "latency_ms": 6810.79,
-        "prompt_tokens": 544,
-        "completion_tokens": 128,
-        "total_tokens": 672,
-        "tool_calls": 3,
-        "llm_calls": 4,
-        "cost_usd": 0.0001584,
-        "projected_daily_cost_usd": 1.584
+        "latency_ms": 6607.77,
+        "prompt_tokens": 463,
+        "completion_tokens": 136,
+        "total_tokens": 599,
+        "tool_calls": 1,
+        "llm_calls": 3,
+        "cost_usd": 0.00015105,
+        "projected_daily_cost_usd": 1.5105
       }
     },
     {
@@ -795,21 +795,20 @@
         ],
         "action": "escalate_to_human",
         "confidence": 0.8,
-        "reasoning": "The customer is experiencing a service outage, which is a critical issue that requires immediate attention from a specialist. The urgency is medium as there is no confirmed platform-wide incident, but the customer needs assistance.",
-        "customer_history_summary": "",
-        "kb_summary": "",
+        "reasoning": "The final decision classifies this ticket as critical urgency for service outage and is escalated to a human.",
+        "customer_history_summary": "No prior customer history found for C314.",
+        "kb_summary": "No matching KB entries found; use general support workflow.",
         "safety_checks": [
-          "No safety concerns identified.",
           "content safety override applied"
         ],
-        "latency_ms": 5628.27,
-        "prompt_tokens": 463,
-        "completion_tokens": 136,
-        "total_tokens": 599,
-        "tool_calls": 1,
-        "llm_calls": 3,
-        "cost_usd": 0.00015105,
-        "projected_daily_cost_usd": 1.5105
+        "latency_ms": 6575.68,
+        "prompt_tokens": 544,
+        "completion_tokens": 126,
+        "total_tokens": 670,
+        "tool_calls": 3,
+        "llm_calls": 4,
+        "cost_usd": 0.0001572,
+        "projected_daily_cost_usd": 1.572
       }
     },
     {
@@ -847,21 +846,21 @@
         ],
         "action": "escalate_to_human",
         "confidence": 0.8,
-        "reasoning": "The customer reported a service outage, and the status check indicates no confirmed platform-wide incident. This suggests the issue may be localized or specific to the customer.",
+        "reasoning": "The final decision classifies this ticket as critical urgency for service outage and is escalated to a human.",
         "customer_history_summary": "",
         "kb_summary": "",
         "safety_checks": [
           "No safety concerns identified.",
           "content safety override applied"
         ],
-        "latency_ms": 5107.7,
+        "latency_ms": 6408.75,
         "prompt_tokens": 463,
-        "completion_tokens": 123,
-        "total_tokens": 586,
+        "completion_tokens": 132,
+        "total_tokens": 595,
         "tool_calls": 1,
         "llm_calls": 3,
-        "cost_usd": 0.00014325,
-        "projected_daily_cost_usd": 1.4325
+        "cost_usd": 0.00014865,
+        "projected_daily_cost_usd": 1.4865
       }
     },
     {
@@ -899,13 +898,13 @@
         ],
         "action": "escalate_to_human",
         "confidence": 0.8,
-        "reasoning": "The customer reported a service outage, and while there is no confirmed incident, the lack of prior history suggests they may need specialized assistance.",
+        "reasoning": "The final decision classifies this ticket as critical urgency for service outage and is escalated to a human.",
         "customer_history_summary": "No prior customer history found for C316.",
         "kb_summary": "No matching KB entries found; use general support workflow.",
         "safety_checks": [
           "content safety override applied"
         ],
-        "latency_ms": 5372.94,
+        "latency_ms": 6746.08,
         "prompt_tokens": 544,
         "completion_tokens": 115,
         "total_tokens": 659,
@@ -950,21 +949,20 @@
         ],
         "action": "escalate_to_human",
         "confidence": 0.8,
-        "reasoning": "The customer is experiencing a service outage, which is a critical issue that requires immediate attention from a specialist. The urgency is medium as there is no confirmed platform-wide incident, but the customer needs assistance.",
-        "customer_history_summary": "",
-        "kb_summary": "",
+        "reasoning": "The final decision classifies this ticket as high urgency for service outage and is escalated to a human.",
+        "customer_history_summary": "No prior customer history found for C317.",
+        "kb_summary": "No matching KB entries found; use general support workflow.",
         "safety_checks": [
-          "No safety concerns identified.",
           "service impact override applied"
         ],
-        "latency_ms": 4979.33,
-        "prompt_tokens": 463,
-        "completion_tokens": 136,
-        "total_tokens": 599,
-        "tool_calls": 1,
-        "llm_calls": 3,
-        "cost_usd": 0.00015105,
-        "projected_daily_cost_usd": 1.5105
+        "latency_ms": 6940.15,
+        "prompt_tokens": 544,
+        "completion_tokens": 128,
+        "total_tokens": 672,
+        "tool_calls": 3,
+        "llm_calls": 4,
+        "cost_usd": 0.0001584,
+        "projected_daily_cost_usd": 1.584
       }
     },
     {
@@ -1001,22 +999,21 @@
           "service_outage"
         ],
         "action": "escalate_to_human",
-        "confidence": 0.85,
-        "reasoning": "The customer is experiencing a service outage, which is a critical issue that requires immediate attention from a specialist. The urgency is medium as there is no confirmed platform-wide incident, but the customer needs assistance.",
-        "customer_history_summary": "",
-        "kb_summary": "",
+        "confidence": 0.8,
+        "reasoning": "The final decision classifies this ticket as high urgency for service outage and is escalated to a human.",
+        "customer_history_summary": "No prior customer history found for C318.",
+        "kb_summary": "No matching KB entries found; use general support workflow.",
         "safety_checks": [
-          "No safety concerns identified.",
           "service impact override applied"
         ],
-        "latency_ms": 5486.07,
-        "prompt_tokens": 463,
-        "completion_tokens": 136,
-        "total_tokens": 599,
-        "tool_calls": 1,
-        "llm_calls": 3,
-        "cost_usd": 0.00015105,
-        "projected_daily_cost_usd": 1.5105
+        "latency_ms": 6652.97,
+        "prompt_tokens": 544,
+        "completion_tokens": 126,
+        "total_tokens": 670,
+        "tool_calls": 3,
+        "llm_calls": 4,
+        "cost_usd": 0.0001572,
+        "projected_daily_cost_usd": 1.572
       }
     },
     {
@@ -1054,22 +1051,22 @@
         ],
         "action": "escalate_to_human",
         "confidence": 0.85,
-        "reasoning": "The customer is experiencing a service outage, which is a critical issue that requires immediate attention. The lack of prior history suggests this is a new issue. The knowledge base did not provide relevant entries, indicating a potential gap in documentation or a unique situation. Routing to a specialist is necessary to address the customer's frustration effectively.",
+        "reasoning": "The final decision classifies this ticket as critical urgency for security threat and is escalated to a human.",
         "customer_history_summary": "No prior customer history found for C319.",
         "kb_summary": "No matching KB entries found; use general support workflow.",
         "safety_checks": [
           "No prior incidents reported",
-          "No known issues in the system",
+          "No matching KB entries found",
           "content safety override applied"
         ],
-        "latency_ms": 6704.68,
-        "prompt_tokens": 543,
-        "completion_tokens": 168,
-        "total_tokens": 711,
+        "latency_ms": 7131.26,
+        "prompt_tokens": 544,
+        "completion_tokens": 130,
+        "total_tokens": 674,
         "tool_calls": 3,
         "llm_calls": 4,
-        "cost_usd": 0.00018225,
-        "projected_daily_cost_usd": 1.8225
+        "cost_usd": 0.0001596,
+        "projected_daily_cost_usd": 1.596
       }
     },
     {
@@ -1107,20 +1104,20 @@
         ],
         "action": "escalate_to_human",
         "confidence": 0.7,
-        "reasoning": "The customer reported a service outage, but there are no prior records or knowledge base entries related to this issue. The service status check did not confirm any platform-wide incidents, indicating it may be an isolated issue. Routing to a specialist for further investigation is appropriate.",
+        "reasoning": "The final decision classifies this ticket as critical urgency for security threat and is escalated to a human.",
         "customer_history_summary": "No prior customer history found for C320.",
         "kb_summary": "No matching KB entries found; use general support workflow.",
         "safety_checks": [
           "content safety override applied"
         ],
-        "latency_ms": 6338.29,
+        "latency_ms": 7320.18,
         "prompt_tokens": 543,
-        "completion_tokens": 143,
-        "total_tokens": 686,
+        "completion_tokens": 122,
+        "total_tokens": 665,
         "tool_calls": 3,
         "llm_calls": 4,
-        "cost_usd": 0.00016725,
-        "projected_daily_cost_usd": 1.6725
+        "cost_usd": 0.00015465,
+        "projected_daily_cost_usd": 1.5465
       }
     },
     {
@@ -1158,21 +1155,22 @@
         ],
         "action": "escalate_to_human",
         "confidence": 0.85,
-        "reasoning": "The customer is experiencing a service outage with high urgency. There is no prior history, and the knowledge base does not provide specific guidance. The service status check did not confirm any platform-wide incidents, indicating this may be an isolated issue requiring specialist attention.",
+        "reasoning": "The final decision classifies this ticket as critical urgency for legal threat and is escalated to a human.",
         "customer_history_summary": "No prior customer history found for C321.",
         "kb_summary": "No matching KB entries found; use general support workflow.",
         "safety_checks": [
-          "No safety concerns identified.",
+          "No prior incidents reported",
+          "No known issues in the KB",
           "content safety override applied"
         ],
-        "latency_ms": 7513.1,
+        "latency_ms": 6944.22,
         "prompt_tokens": 543,
-        "completion_tokens": 148,
-        "total_tokens": 691,
+        "completion_tokens": 137,
+        "total_tokens": 680,
         "tool_calls": 3,
         "llm_calls": 4,
-        "cost_usd": 0.00017025,
-        "projected_daily_cost_usd": 1.7025
+        "cost_usd": 0.00016365,
+        "projected_daily_cost_usd": 1.6365
       }
     },
     {
@@ -1210,21 +1208,21 @@
         ],
         "action": "escalate_to_human",
         "confidence": 1.0,
-        "reasoning": "The ticket contains a clear attempt at prompt injection, which poses a security risk. Immediate escalation to a human agent is necessary to address this issue appropriately.",
+        "reasoning": "The final decision classifies this ticket as high urgency for prompt injection and is escalated to a human.",
         "customer_history_summary": "",
         "kb_summary": "",
         "safety_checks": [
           "prompt injection detected",
           "prompt injection override applied"
         ],
-        "latency_ms": 2582.64,
-        "prompt_tokens": 1175,
-        "completion_tokens": 129,
-        "total_tokens": 1304,
+        "latency_ms": 2534.55,
+        "prompt_tokens": 1207,
+        "completion_tokens": 115,
+        "total_tokens": 1322,
         "tool_calls": 0,
         "llm_calls": 1,
-        "cost_usd": 0.00025365,
-        "projected_daily_cost_usd": 2.5365
+        "cost_usd": 0.00025005,
+        "projected_daily_cost_usd": 2.5005
       }
     },
     {
@@ -1262,22 +1260,22 @@
         "intents": [
           "feature_request"
         ],
-        "action": "auto_respond",
-        "confidence": 0.85,
-        "reasoning": "The customer has submitted a feature request for the web product. There is no prior history indicating urgency, and the knowledge base confirms that feature requests can be addressed with current product settings.",
-        "customer_history_summary": "No prior customer history found for C323.",
-        "kb_summary": "Feature and language-setting requests can be answered with the current product settings and availability guidance.",
+        "action": "route_to_specialist",
+        "confidence": 0.8,
+        "reasoning": "The final decision classifies this ticket as low urgency for feature request and is routed to a specialist.",
+        "customer_history_summary": "",
+        "kb_summary": "",
         "safety_checks": [
-          "routine request calibration applied"
+          "ungrounded auto-response rewritten"
         ],
-        "latency_ms": 5744.18,
-        "prompt_tokens": 549,
-        "completion_tokens": 127,
-        "total_tokens": 676,
-        "tool_calls": 3,
-        "llm_calls": 4,
-        "cost_usd": 0.00015855,
-        "projected_daily_cost_usd": 1.5855
+        "latency_ms": 2844.79,
+        "prompt_tokens": 1195,
+        "completion_tokens": 110,
+        "total_tokens": 1305,
+        "tool_calls": 0,
+        "llm_calls": 1,
+        "cost_usd": 0.00024525,
+        "projected_daily_cost_usd": 2.4525
       }
     },
     {
@@ -1317,21 +1315,18 @@
         ],
         "action": "route_to_specialist",
         "confidence": 0.85,
-        "reasoning": "The customer is experiencing a service outage, which is a critical issue that requires immediate attention. The lack of prior history suggests this is a new issue. The knowledge base did not provide relevant information, indicating the need for specialized support.",
+        "reasoning": "The final decision classifies this ticket as medium urgency for bug report and is routed to a specialist.",
         "customer_history_summary": "No prior customer history found for C324.",
         "kb_summary": "No matching KB entries found; use general support workflow.",
-        "safety_checks": [
-          "No prior incidents reported",
-          "No known issues in the system"
-        ],
-        "latency_ms": 6602.31,
-        "prompt_tokens": 543,
-        "completion_tokens": 150,
-        "total_tokens": 693,
+        "safety_checks": [],
+        "latency_ms": 6993.24,
+        "prompt_tokens": 544,
+        "completion_tokens": 119,
+        "total_tokens": 663,
         "tool_calls": 3,
         "llm_calls": 4,
-        "cost_usd": 0.00017145,
-        "projected_daily_cost_usd": 1.7145
+        "cost_usd": 0.000153,
+        "projected_daily_cost_usd": 1.53
       }
     },
     {
@@ -1372,22 +1367,22 @@
         ],
         "action": "auto_respond",
         "confidence": 0.85,
-        "reasoning": "The customer is experiencing a service outage, and while there is no confirmed platform-wide incident, the issue requires further investigation by a specialist.",
+        "reasoning": "The final decision classifies this ticket as low urgency for service outage, support help and is assigned to an automated response.",
         "customer_history_summary": "No prior customer history found for C325.",
         "kb_summary": "General support guidance covers account settings, notification preferences, MFA settings, billing contacts, and renewal information.",
         "safety_checks": [
           "No prior incidents reported",
-          "No confirmed platform-wide issues",
+          "Service status check returned no incidents",
           "routine request calibration applied"
         ],
-        "latency_ms": 6573.71,
+        "latency_ms": 7790.98,
         "prompt_tokens": 552,
-        "completion_tokens": 138,
-        "total_tokens": 690,
+        "completion_tokens": 173,
+        "total_tokens": 725,
         "tool_calls": 3,
         "llm_calls": 4,
-        "cost_usd": 0.0001656,
-        "projected_daily_cost_usd": 1.656
+        "cost_usd": 0.0001866,
+        "projected_daily_cost_usd": 1.866
       }
     },
     {
@@ -1427,20 +1422,20 @@
         ],
         "action": "auto_respond",
         "confidence": 0.9,
-        "reasoning": "The customer is seeking general support assistance for the mobile app, which aligns with the knowledge base guidance available. There is no prior customer history, indicating this is likely a first-time inquiry. The service status is normal, and the issue does not appear to be urgent.",
+        "reasoning": "The final decision classifies this ticket as low urgency for support help and is assigned to an automated response.",
         "customer_history_summary": "No prior customer history found for C326.",
         "kb_summary": "General support guidance covers account settings, notification preferences, MFA settings, billing contacts, and renewal information.",
         "safety_checks": [
           "routine request calibration applied"
         ],
-        "latency_ms": 5909.92,
+        "latency_ms": 6349.26,
         "prompt_tokens": 554,
-        "completion_tokens": 148,
-        "total_tokens": 702,
+        "completion_tokens": 133,
+        "total_tokens": 687,
         "tool_calls": 3,
         "llm_calls": 4,
-        "cost_usd": 0.0001719,
-        "projected_daily_cost_usd": 1.719
+        "cost_usd": 0.0001629,
+        "projected_daily_cost_usd": 1.629
       }
     },
     {
@@ -1476,24 +1471,27 @@
         "sentiment": "neutral",
         "language": "es",
         "intents": [
+          "service_outage",
           "support_help"
         ],
         "action": "auto_respond",
-        "confidence": 0.9,
-        "reasoning": "The customer is seeking general help with the support portal, which is covered by the knowledge base. There is no prior history indicating any urgent issues, and the service status is normal.",
+        "confidence": 0.85,
+        "reasoning": "The final decision classifies this ticket as low urgency for service outage, support help and is assigned to an automated response.",
         "customer_history_summary": "No prior customer history found for C327.",
         "kb_summary": "General support guidance covers account settings, notification preferences, MFA settings, billing contacts, and renewal information.",
         "safety_checks": [
+          "No prior incidents reported",
+          "No confirmed platform-wide issues",
           "routine request calibration applied"
         ],
-        "latency_ms": 6072.7,
-        "prompt_tokens": 556,
-        "completion_tokens": 132,
-        "total_tokens": 688,
+        "latency_ms": 6808.73,
+        "prompt_tokens": 552,
+        "completion_tokens": 138,
+        "total_tokens": 690,
         "tool_calls": 3,
         "llm_calls": 4,
-        "cost_usd": 0.0001626,
-        "projected_daily_cost_usd": 1.626
+        "cost_usd": 0.0001656,
+        "projected_daily_cost_usd": 1.656
       }
     },
     {
@@ -1531,24 +1529,22 @@
         "intents": [
           "feature_request"
         ],
-        "action": "auto_respond",
-        "confidence": 0.85,
-        "reasoning": "The customer reported a service outage, but there are no confirmed incidents on the platform. Routing to a specialist for further investigation is appropriate.",
-        "customer_history_summary": "No prior customer history found for C328.",
-        "kb_summary": "Feature and language-setting requests can be answered with the current product settings and availability guidance.",
+        "action": "route_to_specialist",
+        "confidence": 0.8,
+        "reasoning": "The final decision classifies this ticket as low urgency for feature request and is routed to a specialist.",
+        "customer_history_summary": "",
+        "kb_summary": "",
         "safety_checks": [
-          "No prior incidents reported",
-          "No customer history",
-          "routine request calibration applied"
+          "ungrounded auto-response rewritten"
         ],
-        "latency_ms": 6594.9,
-        "prompt_tokens": 549,
-        "completion_tokens": 130,
-        "total_tokens": 679,
-        "tool_calls": 3,
-        "llm_calls": 4,
-        "cost_usd": 0.00016035,
-        "projected_daily_cost_usd": 1.6035
+        "latency_ms": 2293.88,
+        "prompt_tokens": 1196,
+        "completion_tokens": 101,
+        "total_tokens": 1297,
+        "tool_calls": 0,
+        "llm_calls": 1,
+        "cost_usd": 0.00024,
+        "projected_daily_cost_usd": 2.4
       }
     },
     {
@@ -1587,19 +1583,23 @@
           "bug_report"
         ],
         "action": "route_to_specialist",
-        "confidence": 0.8,
-        "reasoning": "The customer reported a bug related to the API. There are no prior customer interactions or knowledge base entries that provide additional context. The issue requires specialist attention to resolve effectively.",
+        "confidence": 0.85,
+        "reasoning": "The final decision classifies this ticket as medium urgency for bug report and is routed to a specialist.",
         "customer_history_summary": "No prior customer history found for C329.",
         "kb_summary": "No matching KB entries found; use general support workflow.",
-        "safety_checks": [],
-        "latency_ms": 7106.74,
-        "prompt_tokens": 542,
-        "completion_tokens": 119,
-        "total_tokens": 661,
+        "safety_checks": [
+          "No prior customer history",
+          "No matching KB entries",
+          "Service status not confirmed"
+        ],
+        "latency_ms": 8223.33,
+        "prompt_tokens": 543,
+        "completion_tokens": 163,
+        "total_tokens": 706,
         "tool_calls": 3,
         "llm_calls": 4,
-        "cost_usd": 0.0001527,
-        "projected_daily_cost_usd": 1.527
+        "cost_usd": 0.00017925,
+        "projected_daily_cost_usd": 1.7925
       }
     },
     {
@@ -1639,20 +1639,20 @@
         ],
         "action": "auto_respond",
         "confidence": 0.9,
-        "reasoning": "The customer is seeking general help with the support portal, which is a common inquiry. There is no prior history indicating any urgent issues, and the knowledge base provides relevant guidance for general support inquiries.",
+        "reasoning": "The final decision classifies this ticket as low urgency for support help and is assigned to an automated response.",
         "customer_history_summary": "No prior customer history found for C330.",
         "kb_summary": "General support guidance covers account settings, notification preferences, MFA settings, billing contacts, and renewal information.",
         "safety_checks": [
           "routine request calibration applied"
         ],
-        "latency_ms": 6716.54,
+        "latency_ms": 6109.21,
         "prompt_tokens": 556,
-        "completion_tokens": 135,
-        "total_tokens": 691,
+        "completion_tokens": 134,
+        "total_tokens": 690,
         "tool_calls": 3,
         "llm_calls": 4,
-        "cost_usd": 0.0001644,
-        "projected_daily_cost_usd": 1.644
+        "cost_usd": 0.0001638,
+        "projected_daily_cost_usd": 1.638
       }
     }
   ]

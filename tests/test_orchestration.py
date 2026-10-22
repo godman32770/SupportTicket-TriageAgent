@@ -117,6 +117,54 @@ def test_content_calibration_escalates_suspected_breach():
     assert result.urgency == "critical"
     assert result.action == "escalate_to_human"
     assert result.intents == ["security_threat"]
+    assert result.reasoning == (
+        "The final decision classifies this ticket as critical urgency for security threat "
+        "and is escalated to a human."
+    )
+
+
+def test_reasoning_is_regenerated_after_action_calibration():
+    decision = _decision()
+    decision.update({
+        "urgency": "low",
+        "action": "auto_respond",
+        "intents": ["login_help"],
+        "reasoning": "The customer is experiencing a service outage and should be escalated.",
+    })
+    client = SequenceClient([{"type": "final", "decision": decision}])
+
+    result = TriageAgent(llm_client=client).run({
+        "ticket_id": "T-reset",
+        "customer_id": "C-reset",
+        "product": "support_portal",
+        "issue_type": "login",
+        "description": "I need to reset my password for my family account.",
+    })
+
+    assert result.action == "route_to_specialist"
+    assert result.reasoning == (
+        "The final decision classifies this ticket as low urgency for login help and is routed to a specialist."
+    )
+    assert "outage" not in result.reasoning
+
+
+def test_invalid_action_still_reaches_schema_fallback():
+    decision = _decision()
+    decision["action"] = "invalid_action"
+    client = SequenceClient([{"type": "final", "decision": decision}])
+
+    result = TriageAgent(llm_client=client, max_model_retries=0).run({
+        "ticket_id": "T-invalid",
+        "customer_id": "C-invalid",
+        "product": "web",
+        "issue_type": "general_help",
+        "description": "I have a general account question.",
+    })
+
+    assert result.action == "escalate_to_human"
+    assert result.reasoning == (
+        "The final decision classifies this ticket as high urgency for support help and is escalated to a human."
+    )
 
 
 def test_contained_outage_is_high_not_critical():
