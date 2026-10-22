@@ -13,7 +13,7 @@ from app.models import normalize_ticket
 from app.models.triage import SupportTicket, TriageDecision
 from app.telemetry.metrics import TelemetryEvent, TelemetryRecorder
 from app.telemetry.redaction import redact_pii
-from app.tools import CustomerHistoryTool, KBLookupTool
+from app.tools import CustomerHistoryTool, KBLookupTool, ToolResult
 
 logger = logging.getLogger(__name__)
 
@@ -36,12 +36,21 @@ class ToolRegistry:
             "knowledge_base": ToolSpec(
                 "knowledge_base",
                 "Look up issue-specific knowledge-base guidance for the product and issue type.",
-                lambda ticket: kb_tool.lookup(
-                    str(ticket.get("product", "")),
-                    str(ticket.get("issue_type", "")),
-                ),
+                self._lookup_kb,
             ),
         }
+        self._kb_tool = kb_tool
+
+    def _lookup_kb(self, ticket: Mapping[str, Any]) -> ToolResult:
+        product = str(ticket.get("product", ""))
+        issue_type = str(ticket.get("issue_type", ""))
+        description = str(ticket.get("description", ""))
+        try:
+            return self._kb_tool.lookup(product, issue_type, description)
+        except TypeError:
+            # Preserve compatibility with injected test/integration tools that
+            # implement the original two-argument lookup contract.
+            return self._kb_tool.lookup(product, issue_type)
 
     def available(self) -> list[str]:
         return list(self._tools)
@@ -199,6 +208,7 @@ class TriageAgent:
         context: dict[str, Any] = {
             "available_tools": ["customer_history", "knowledge_base"],
             "feedback": [],
+            "tool_trace": [],
         }
         used_tools: set[str] = set()
         tool_calls = 0
@@ -210,7 +220,11 @@ class TriageAgent:
             context["available_tools"] = [
                 name for name in self.tool_registry.available() if name not in used_tools
             ]
-            context["force_submit"] = tool_calls >= self.max_tool_calls or not context["available_tools"]
+            context["force_submit"] = (
+                context.get("force_submit_next", False)
+                or tool_calls >= self.max_tool_calls
+                or not context["available_tools"]
+            )
             try:
                 llm_calls += 1
                 raw = self.llm_client.generate(ticket_data, context)
@@ -230,6 +244,8 @@ class TriageAgent:
                 logger.warning("Model responded with parse error for ticket %s: %s", ticket.ticket_id, safe_err)
                 self._record_event("parse_error", ticket.ticket_id, metadata={"error": safe_err})
                 context["feedback"] = [response["error"]]
+                context["tool_trace"].append({"event": "invalid_model_response", "error": response["error"]})
+                context["force_submit_next"] = True
                 continue
 
             if response.get("type") == "tool_call":
@@ -240,10 +256,13 @@ class TriageAgent:
                     context["feedback"] = [
                         "Tool request unavailable: each available tool may be called once, up to the tool-call limit."
                     ]
+                    context["tool_trace"].append({"event": "rejected_tool_call", "tool": tool_name})
+                    context["force_submit_next"] = True
                     continue
 
                 used_tools.add(tool_name)
                 tool_calls += 1
+                context["tool_trace"].append({"event": "tool_call", "tool": tool_name})
                 try:
                     result = self.tool_registry.execute(ticket_data, tool_name)
                     if tool_name == "customer_history":
@@ -255,15 +274,18 @@ class TriageAgent:
                         context["feedback"] = [
                             f"{tool_name} tool reported failure: {result.error or 'no details provided'}."
                         ]
+                        context["tool_trace"].append({"event": "tool_error", "tool": tool_name})
                         retries += 1
                     else:
                         context["feedback"] = []
+                        context["tool_trace"].append({"event": "tool_result", "tool": tool_name, "status": "success"})
                 except (RuntimeError, ValueError, TypeError, OSError) as exc:
                     context[tool_name if tool_name == "customer_history" else "kb"] = (
                         f"{tool_name.replace('_', ' ').title()} lookup unavailable."
                     )
                     logger.exception("Tool execution crashed for %s on ticket %s", tool_name, ticket.ticket_id)
                     context["feedback"] = [f"{tool_name} tool failed: {type(exc).__name__}."]
+                    context["tool_trace"].append({"event": "tool_error", "tool": tool_name})
                     retries += 1
                 continue
 

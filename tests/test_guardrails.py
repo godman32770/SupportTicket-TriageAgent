@@ -35,6 +35,7 @@ def make_decision(**kwargs):
         (make_decision(action="auto_respond", confidence=0.6), "confidence"),
         (make_decision(intents=["human_escalation"], action="auto_respond", kb_summary="KB article about password reset."), "intent"),
         (make_decision(action="auto_respond", reasoning="I can offer a refund immediately", kb_summary="KB article about refund process."), "refund"),
+        (make_decision(action="auto_respond", reasoning="The customer is locked out and cannot access the account."), "account_access"),
     ],
 )
 def test_guardrail_rules_trigger(decision, expected_fragment):

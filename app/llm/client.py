@@ -48,7 +48,6 @@ def _infer_urgency(description: str) -> str:
         "asap",
         "immediately",
         "locked out",
-        "cannot log in",
         "can't log in",
         "cannot access",
         "unable to access",
@@ -190,6 +189,9 @@ class OfflineLLMClient(LLMClient):
             if "urgent" in description or "locked out" in description or "cannot access" in description:
                 urgency, action = "high", "escalate_to_human"
             else:
+                # A routine password-reset failure is low risk unless the
+                # ticket explicitly indicates lockout, urgency, or broader
+                # account access failure.
                 urgency, action = "low", "auto_respond"
             intent = "login_help"
         elif issue == "general_help" or issue == "support":

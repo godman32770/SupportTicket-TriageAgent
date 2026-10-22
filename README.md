@@ -162,7 +162,7 @@ python -m eval.run_eval --file eval/benchmark_30.json --mode offline --no-write
 The app is split into clear responsibilities:
 
 - `app/models/` defines structured ticket and triage output objects and the JSON schema
-- `app/tools/` contains read-only customer history and knowledge base lookups
+- `app/tools/` contains read-only customer history and knowledge base lookups; KB lookup first uses structured fields and then falls back to ticket-description terms
 - `app/llm/` contains the live OpenAI adapter and the deterministic offline mock
 - `app/guardrails/` contains the policy guardrail checks used before accepting a model response
 - `app/agent/` contains the orchestrator loop and fallback logic
@@ -288,9 +288,9 @@ The 30-ticket fixture gives a less optimistic view. The majority-class baseline 
 | Majority baseline (30-ticket gold set) | 30 | 0.33 | 0.40 | 0.33 | 7 |
 | Offline deterministic mock (15-ticket smoke set) | 15 | 0.87 | 0.87 | 0.87 | 0 |
 | Offline deterministic mock (30-ticket benchmark) | 30 | 0.63 | 0.73 | 0.63 | 1 |
-| Live `gpt-4o-mini` (2026-10-22) | 30 | 0.47 | 0.60 | 0.47 | 1 |
+| Live `gpt-4o-mini` (2026-10-22, post-fix rerun) | 30 | 0.57 | 0.70 | 0.57 | 2 |
 
-The live run also measured 0.92 escalation recall, 0.20 fallback rate, 5,691 ms latency p50, 11,170 ms p95, 3 model calls per ticket at p50, and approximately $2.20 projected cost per 10,000 tickets. The complete per-case result is saved at `eval/results/gpt-4o-mini-2026-10-22.json`.
+The post-fix live run measured 0.83 escalation recall, 0.03 fallback rate, 5,211 ms latency p50, 9,564 ms p95, 2 model calls per ticket at p50, and approximately $2.28 projected cost per 10,000 tickets. Compared with the earlier run, reliability improved but two high-risk cases were not escalated, so the guardrail/evaluation policy still needs work. The complete per-case result is saved at `eval/results/gpt-4o-mini-2026-10-22.json`.
 
 Live mode is a single command. Copy `.env.example` to `.env`, set a valid key, and run:
 
@@ -338,8 +338,10 @@ Production rollout starts in shadow mode with human approval. Human corrections 
 - Live mode is subject to OpenAI cost and model drift, so budget caps and dataset versioning matter.
 - `fallback_rate` is an important safety metric because it catches policy failures that a high `safety_policy_pass_rate` can hide.
 - The agent loop is intentionally bounded orchestration: the live model chooses whether to request a registered tool, but it cannot invent tools or run indefinitely. This improves auditability and safety at the cost of less open-ended agent behavior.
-- The benchmark labels are illustrative and not independently validated. The 30-ticket result is too small for a production claim, and no live-model score is checked into the repository.
+- The benchmark labels are illustrative and not independently validated. The 30-ticket result is too small for a production claim, and the checked-in live score is only one model/date snapshot.
 - The majority baseline is only a reference point; the next evaluation step is a held-out, human-reviewed set with repeated live runs and error analysis by category.
+- All bundled tickets and labels are synthetic fixtures; they demonstrate behavior and regression coverage, not performance on real customer traffic.
+- The saved 2026-10-22 live result predates the current tool-state and KB-retrieval fixes; rerun the live benchmark before comparing post-fix model metrics.
 
 ## Telemetry and privacy
 

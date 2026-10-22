@@ -54,6 +54,9 @@ Customer history result:
 Knowledge base result:
 {kb}
 
+Tool-call trace (the application state from earlier turns):
+{tool_trace}
+
 Orchestration feedback:
 {feedback}
 
@@ -70,5 +73,6 @@ def build_prompt(ticket: Mapping[str, Any], context: Mapping[str, Any]) -> str:
         available_tools=json.dumps(context.get("available_tools", []), ensure_ascii=False),
         customer_history=json.dumps(context.get("customer_history"), ensure_ascii=False, default=str),
         kb=json.dumps(context.get("kb"), ensure_ascii=False, default=str),
+        tool_trace=json.dumps(context.get("tool_trace", []), ensure_ascii=False, default=str),
         feedback=json.dumps(context.get("feedback", []), ensure_ascii=False, default=str),
     )

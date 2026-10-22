@@ -2,36 +2,36 @@
   "model": "gpt-4o-mini",
   "mode": "live",
   "metrics": {
-    "urgency_accuracy": 0.4666666666666667,
-    "action_accuracy": 0.6,
-    "overall_accuracy": 0.4666666666666667,
-    "fallback_rate": 0.2,
+    "urgency_accuracy": 0.5666666666666667,
+    "action_accuracy": 0.7,
+    "overall_accuracy": 0.5666666666666667,
+    "fallback_rate": 0.03333333333333333,
     "kb_grounding_rate": 1.0,
-    "auto_respond_precision": 1.0,
-    "auto_respond_recall": 0.1,
-    "route_to_specialist_precision": 0.46153846153846156,
-    "route_to_specialist_recall": 0.75,
-    "escalate_to_human_precision": 0.6875,
-    "escalate_to_human_recall": 0.9166666666666666,
-    "escalation_recall": 0.9166666666666666,
+    "auto_respond_precision": 0.75,
+    "auto_respond_recall": 0.3,
+    "route_to_specialist_precision": 0.5333333333333333,
+    "route_to_specialist_recall": 1.0,
+    "escalate_to_human_precision": 0.9090909090909091,
+    "escalate_to_human_recall": 0.8333333333333334,
+    "escalation_recall": 0.8333333333333334,
     "urgency_confusion_matrix": {
       "low": {
-        "low": 1,
-        "medium": 5,
-        "high": 4,
+        "low": 2,
+        "medium": 7,
+        "high": 1,
         "critical": 0
       },
       "medium": {
         "low": 0,
-        "medium": 6,
-        "high": 2,
+        "medium": 8,
+        "high": 0,
         "critical": 0
       },
       "high": {
         "low": 0,
-        "medium": 1,
+        "medium": 2,
         "high": 0,
-        "critical": 4
+        "critical": 3
       },
       "critical": {
         "low": 0,
@@ -40,24 +40,24 @@
         "critical": 7
       }
     },
-    "critical_cases_missed": 1.0,
+    "critical_cases_missed": 2.0,
     "product_accuracy": 1.0,
-    "issue_type_accuracy": 0.7666666666666667,
+    "issue_type_accuracy": 0.8,
     "sentiment_accuracy": 1.0,
     "language_accuracy": 1.0,
-    "intents_accuracy": 0.9333333333333333,
-    "kb_hit_rate": 0.3333333333333333,
+    "intents_accuracy": 0.8333333333333334,
+    "kb_hit_rate": 0.36666666666666664,
     "safety_policy_pass_rate": 1.0,
-    "latency_p50_ms": 5691.34,
-    "latency_p95_ms": 11169.61,
+    "latency_p50_ms": 5210.78,
+    "latency_p95_ms": 9564.12,
     "latency_sample_count": 30.0,
-    "cost_usd_p50": 0.00022035,
-    "cost_usd_p95": 0.00024585,
+    "cost_usd_p50": 0.00022815,
+    "cost_usd_p95": 0.0002475,
     "cost_usd_sample_count": 30.0,
-    "llm_calls_p50": 3.0,
+    "llm_calls_p50": 2.0,
     "llm_calls_p95": 4.0,
     "llm_calls_sample_count": 30.0,
-    "projected_daily_cost_usd_p50": 2.2035
+    "projected_daily_cost_usd_p50": 2.2815
   },
   "cases": [
     {
@@ -96,19 +96,19 @@
           "login_help"
         ],
         "action": "route_to_specialist",
-        "confidence": 0.5,
-        "reasoning": "The customer is experiencing a login issue related to a forgotten password and not receiving a reset email. There is no relevant knowledge base information to support an auto-response, and the customer's history shows no prior interactions. Therefore, it is best to route this to a specialist for further assistance.",
-        "customer_history_summary": "No prior customer history found for C301.",
+        "confidence": 0.7,
+        "reasoning": "The customer is experiencing a login issue related to a forgotten password and is not receiving the reset email. This requires specialist assistance as there is no knowledge base support available for this issue.",
+        "customer_history_summary": "",
         "kb_summary": "",
         "safety_checks": [],
-        "latency_ms": 13452.59,
-        "prompt_tokens": 1001,
-        "completion_tokens": 152,
-        "total_tokens": 1153,
-        "tool_calls": 1,
-        "llm_calls": 4,
-        "cost_usd": 0.00024135,
-        "projected_daily_cost_usd": 2.4135
+        "latency_ms": 7080.93,
+        "prompt_tokens": 989,
+        "completion_tokens": 128,
+        "total_tokens": 1117,
+        "tool_calls": 0,
+        "llm_calls": 2,
+        "cost_usd": 0.00022515,
+        "projected_daily_cost_usd": 2.2515
       }
     },
     {
@@ -138,7 +138,7 @@
       },
       "actual": {
         "ticket_id": "T302",
-        "urgency": "critical",
+        "urgency": "medium",
         "product": "mobile_app",
         "issue_type": "login",
         "sentiment": "frustrated",
@@ -146,22 +146,20 @@
         "intents": [
           "login_help"
         ],
-        "action": "escalate_to_human",
-        "confidence": 0.0,
-        "reasoning": "Fallback triggered because the model output, tool context, or policy check was invalid or unsafe; the system escalated to a human for safety.",
+        "action": "auto_respond",
+        "confidence": 0.8,
+        "reasoning": "The customer is locked out of their account and requires assistance with login issues. The knowledge base indicates that password reset flows are available, which can help resolve the issue. Given the lack of prior history and the nature of the request, an auto-response with guidance on password reset is appropriate.",
         "customer_history_summary": "No prior customer history found for C302.",
-        "kb_summary": "Knowledge base was not requested.",
-        "safety_checks": [
-          "fallback guardrail applied"
-        ],
-        "latency_ms": 11169.61,
-        "prompt_tokens": 983,
-        "completion_tokens": 144,
-        "total_tokens": 1127,
-        "tool_calls": 1,
+        "kb_summary": "Password reset flows are available; if MFA issues persist, escalate to specialist.",
+        "safety_checks": [],
+        "latency_ms": 9444.98,
+        "prompt_tokens": 1118,
+        "completion_tokens": 148,
+        "total_tokens": 1266,
+        "tool_calls": 2,
         "llm_calls": 4,
-        "cost_usd": 0.00023385,
-        "projected_daily_cost_usd": 2.3385
+        "cost_usd": 0.0002565,
+        "projected_daily_cost_usd": 2.565
       }
     },
     {
@@ -197,22 +195,22 @@
         "sentiment": "frustrated",
         "language": "en",
         "intents": [
-          "login_help"
+          "support_help"
         ],
         "action": "route_to_specialist",
-        "confidence": 0.7,
-        "reasoning": "The customer is experiencing issues with their MFA code, which is preventing them from signing in. This is a login-related issue that requires specialist assistance.",
-        "customer_history_summary": "",
-        "kb_summary": "",
+        "confidence": 0.8,
+        "reasoning": "The customer is experiencing issues with MFA codes, which is a login-related problem. Given the knowledge base suggests escalating to a specialist if MFA issues persist, routing to a specialist is appropriate.",
+        "customer_history_summary": "No prior customer history found for C303.",
+        "kb_summary": "Password reset flows are available; if MFA issues persist, escalate to specialist.",
         "safety_checks": [],
-        "latency_ms": 2814.63,
-        "prompt_tokens": 957,
-        "completion_tokens": 119,
-        "total_tokens": 1076,
-        "tool_calls": 0,
-        "llm_calls": 1,
-        "cost_usd": 0.00021495,
-        "projected_daily_cost_usd": 2.1495
+        "latency_ms": 6137.45,
+        "prompt_tokens": 1062,
+        "completion_tokens": 128,
+        "total_tokens": 1190,
+        "tool_calls": 2,
+        "llm_calls": 3,
+        "cost_usd": 0.0002361,
+        "projected_daily_cost_usd": 2.361
       }
     },
     {
@@ -253,18 +251,18 @@
         ],
         "action": "route_to_specialist",
         "confidence": 0.5,
-        "reasoning": "The ticket is related to a login issue where the customer needs help resetting their password. There is no knowledge base support available for this issue, and the customer has no prior history. Therefore, it is best to route this to a specialist for further assistance.",
-        "customer_history_summary": "No prior customer history found for C304.",
+        "reasoning": "The customer is requesting help to reset their password, which falls under login assistance. However, there is no knowledge base evidence to support an auto-response, so it is best to route this to a specialist for further assistance.",
+        "customer_history_summary": "",
         "kb_summary": "",
         "safety_checks": [],
-        "latency_ms": 8649.27,
-        "prompt_tokens": 1002,
-        "completion_tokens": 146,
-        "total_tokens": 1148,
-        "tool_calls": 1,
-        "llm_calls": 4,
-        "cost_usd": 0.0002379,
-        "projected_daily_cost_usd": 2.379
+        "latency_ms": 5692.75,
+        "prompt_tokens": 990,
+        "completion_tokens": 132,
+        "total_tokens": 1122,
+        "tool_calls": 0,
+        "llm_calls": 2,
+        "cost_usd": 0.0002277,
+        "projected_daily_cost_usd": 2.277
       }
     },
     {
@@ -304,18 +302,18 @@
         ],
         "action": "route_to_specialist",
         "confidence": 0.5,
-        "reasoning": "The customer's account was temporarily disabled due to too many login attempts, which requires specialist assistance to resolve. The knowledge base did not provide relevant information to address the issue directly, and the customer's frustration indicates a need for human support.",
+        "reasoning": "The customer's account was temporarily disabled due to too many login attempts, which requires specialist assistance to resolve. There is no available knowledge base information to support an auto-response, and the customer's frustration indicates a need for direct support.",
         "customer_history_summary": "",
         "kb_summary": "",
         "safety_checks": [],
-        "latency_ms": 6235.52,
-        "prompt_tokens": 999,
-        "completion_tokens": 139,
-        "total_tokens": 1138,
+        "latency_ms": 5513.78,
+        "prompt_tokens": 1011,
+        "completion_tokens": 135,
+        "total_tokens": 1146,
         "tool_calls": 0,
         "llm_calls": 2,
-        "cost_usd": 0.00023325,
-        "projected_daily_cost_usd": 2.3325
+        "cost_usd": 0.00023265,
+        "projected_daily_cost_usd": 2.3265
       }
     },
     {
@@ -345,30 +343,28 @@
       },
       "actual": {
         "ticket_id": "T306",
-        "urgency": "high",
+        "urgency": "low",
         "product": "support_portal",
         "issue_type": "login",
         "sentiment": "neutral",
         "language": "en",
         "intents": [
-          "login_help"
+          "support_help"
         ],
-        "action": "escalate_to_human",
-        "confidence": 0.0,
-        "reasoning": "Fallback triggered because the model output, tool context, or policy check was invalid or unsafe; the system escalated to a human for safety.",
+        "action": "auto_respond",
+        "confidence": 0.9,
+        "reasoning": "The customer is requesting a password reset for their family account, which is a standard support request. The knowledge base confirms that password reset flows are available, allowing for an auto-response to guide the customer through the process.",
         "customer_history_summary": "No prior customer history found for C306.",
-        "kb_summary": "Knowledge base was not requested.",
-        "safety_checks": [
-          "fallback guardrail applied"
-        ],
-        "latency_ms": 8860.24,
-        "prompt_tokens": 979,
-        "completion_tokens": 156,
-        "total_tokens": 1135,
-        "tool_calls": 1,
-        "llm_calls": 4,
-        "cost_usd": 0.00024045,
-        "projected_daily_cost_usd": 2.4045
+        "kb_summary": "Password reset flows are available; if MFA issues persist, escalate to specialist.",
+        "safety_checks": [],
+        "latency_ms": 6229.36,
+        "prompt_tokens": 1061,
+        "completion_tokens": 133,
+        "total_tokens": 1194,
+        "tool_calls": 2,
+        "llm_calls": 3,
+        "cost_usd": 0.00023895,
+        "projected_daily_cost_usd": 2.3895
       }
     },
     {
@@ -409,18 +405,18 @@
         ],
         "action": "route_to_specialist",
         "confidence": 0.8,
-        "reasoning": "The customer reported being charged twice for the same invoice, which indicates a billing dispute. Given the nature of the issue, it requires specialized attention to resolve the payment problem effectively.",
+        "reasoning": "The customer reported being charged twice for the same invoice, which indicates a billing dispute that requires specialist attention. The sentiment is angry, suggesting urgency in resolving the issue, but it does not indicate a critical situation. Therefore, routing to a specialist is appropriate.",
         "customer_history_summary": "",
         "kb_summary": "",
         "safety_checks": [],
-        "latency_ms": 2410.95,
-        "prompt_tokens": 957,
-        "completion_tokens": 125,
-        "total_tokens": 1082,
+        "latency_ms": 2987.8,
+        "prompt_tokens": 969,
+        "completion_tokens": 141,
+        "total_tokens": 1110,
         "tool_calls": 0,
         "llm_calls": 1,
-        "cost_usd": 0.00021855,
-        "projected_daily_cost_usd": 2.1855
+        "cost_usd": 0.00022995,
+        "projected_daily_cost_usd": 2.2995
       }
     },
     {
@@ -456,22 +452,22 @@
         "sentiment": "neutral",
         "language": "en",
         "intents": [
-          "billing_dispute"
+          "support_help"
         ],
         "action": "route_to_specialist",
         "confidence": 0.7,
-        "reasoning": "The customer is inquiring about their payment due date, which indicates a billing-related issue. Since this is a billing dispute, it requires a specialist's attention.",
-        "customer_history_summary": "No prior customer history found for C308.",
+        "reasoning": "The customer is inquiring about the payment due date for their invoice, which is a billing-related question. This requires specialized assistance to provide accurate information regarding billing timelines.",
+        "customer_history_summary": "",
         "kb_summary": "",
         "safety_checks": [],
-        "latency_ms": 6348.8,
-        "prompt_tokens": 981,
-        "completion_tokens": 127,
-        "total_tokens": 1108,
-        "tool_calls": 1,
-        "llm_calls": 3,
-        "cost_usd": 0.00022335,
-        "projected_daily_cost_usd": 2.2335
+        "latency_ms": 2361.12,
+        "prompt_tokens": 970,
+        "completion_tokens": 121,
+        "total_tokens": 1091,
+        "tool_calls": 0,
+        "llm_calls": 1,
+        "cost_usd": 0.0002181,
+        "projected_daily_cost_usd": 2.181
       }
     },
     {
@@ -512,18 +508,18 @@
         ],
         "action": "route_to_specialist",
         "confidence": 0.8,
-        "reasoning": "The customer is requesting a refund for a mistaken charge, which falls under billing disputes. Given the sentiment of anger, it is important to route this to a specialist for proper handling.",
+        "reasoning": "The customer is requesting a refund for a mistaken charge, which falls under billing disputes. Given the customer's anger and the nature of the request, it is appropriate to route this to a specialist for further handling.",
         "customer_history_summary": "",
         "kb_summary": "",
         "safety_checks": [],
-        "latency_ms": 3567.36,
-        "prompt_tokens": 956,
-        "completion_tokens": 126,
-        "total_tokens": 1082,
+        "latency_ms": 3101.33,
+        "prompt_tokens": 968,
+        "completion_tokens": 131,
+        "total_tokens": 1099,
         "tool_calls": 0,
         "llm_calls": 1,
-        "cost_usd": 0.000219,
-        "projected_daily_cost_usd": 2.19
+        "cost_usd": 0.0002238,
+        "projected_daily_cost_usd": 2.238
       }
     },
     {
@@ -563,18 +559,18 @@
         ],
         "action": "route_to_specialist",
         "confidence": 0.8,
-        "reasoning": "The customer is experiencing an issue with the renewal price, indicating a potential billing dispute that requires specialist attention.",
+        "reasoning": "The customer is experiencing a billing dispute regarding an incorrect renewal price, which requires specialist attention to resolve.",
         "customer_history_summary": "",
         "kb_summary": "",
         "safety_checks": [],
-        "latency_ms": 2264.93,
-        "prompt_tokens": 957,
-        "completion_tokens": 112,
-        "total_tokens": 1069,
+        "latency_ms": 2257.01,
+        "prompt_tokens": 969,
+        "completion_tokens": 111,
+        "total_tokens": 1080,
         "tool_calls": 0,
         "llm_calls": 1,
-        "cost_usd": 0.00021075,
-        "projected_daily_cost_usd": 2.1075
+        "cost_usd": 0.00021195,
+        "projected_daily_cost_usd": 2.1195
       }
     },
     {
@@ -618,14 +614,14 @@
         "customer_history_summary": "",
         "kb_summary": "",
         "safety_checks": [],
-        "latency_ms": 2736.62,
-        "prompt_tokens": 957,
+        "latency_ms": 2672.43,
+        "prompt_tokens": 969,
         "completion_tokens": 115,
-        "total_tokens": 1072,
+        "total_tokens": 1084,
         "tool_calls": 0,
         "llm_calls": 1,
-        "cost_usd": 0.00021255,
-        "projected_daily_cost_usd": 2.1255
+        "cost_usd": 0.00021435,
+        "projected_daily_cost_usd": 2.1435
       }
     },
     {
@@ -665,18 +661,18 @@
         ],
         "action": "route_to_specialist",
         "confidence": 0.7,
-        "reasoning": "The customer is seeking clarification on recent charges, which indicates a billing dispute. Given the lack of customer history and knowledge base support, it is prudent to route this to a specialist for further assistance.",
+        "reasoning": "The customer is seeking clarification on recent charges, which indicates a billing dispute. However, there are no specific details about duplicate charges or unresolved payment issues. Therefore, it is appropriate to route this to a specialist for further assistance.",
         "customer_history_summary": "",
         "kb_summary": "",
         "safety_checks": [],
-        "latency_ms": 2993.88,
-        "prompt_tokens": 957,
-        "completion_tokens": 126,
-        "total_tokens": 1083,
+        "latency_ms": 3324.29,
+        "prompt_tokens": 969,
+        "completion_tokens": 133,
+        "total_tokens": 1102,
         "tool_calls": 0,
         "llm_calls": 1,
-        "cost_usd": 0.00021915,
-        "projected_daily_cost_usd": 2.1915
+        "cost_usd": 0.00022515,
+        "projected_daily_cost_usd": 2.2515
       }
     },
     {
@@ -706,7 +702,7 @@
         "ticket_id": "T313",
         "urgency": "critical",
         "product": "enterprise",
-        "issue_type": "outage",
+        "issue_type": "service_outage",
         "sentiment": "angry",
         "language": "en",
         "intents": [
@@ -714,18 +710,18 @@
         ],
         "action": "escalate_to_human",
         "confidence": 1.0,
-        "reasoning": "The ticket describes an enterprise outage affecting the dashboard and customer traffic, which is a critical issue that requires immediate human intervention.",
+        "reasoning": "The ticket describes a critical service outage affecting the enterprise dashboard, which is causing customer traffic failures across all regions. This qualifies as a critical issue that requires immediate human intervention.",
         "customer_history_summary": "",
         "kb_summary": "",
         "safety_checks": [],
-        "latency_ms": 2402.3,
-        "prompt_tokens": 959,
-        "completion_tokens": 116,
-        "total_tokens": 1075,
+        "latency_ms": 2406.11,
+        "prompt_tokens": 971,
+        "completion_tokens": 127,
+        "total_tokens": 1098,
         "tool_calls": 0,
         "llm_calls": 1,
-        "cost_usd": 0.00021345,
-        "projected_daily_cost_usd": 2.1345
+        "cost_usd": 0.00022185,
+        "projected_daily_cost_usd": 2.2185
       }
     },
     {
@@ -763,18 +759,18 @@
         ],
         "action": "escalate_to_human",
         "confidence": 1.0,
-        "reasoning": "The ticket describes a critical service outage where the API is down across all customer tenants, which directly impacts order processing. This qualifies as a critical issue that requires immediate human intervention.",
-        "customer_history_summary": "",
+        "reasoning": "The ticket describes a critical service outage where the API is down across all customer tenants, affecting order processing. This qualifies as a service outage that requires immediate human intervention.",
+        "customer_history_summary": "No prior customer history found for C314.",
         "kb_summary": "",
         "safety_checks": [],
-        "latency_ms": 2500.81,
-        "prompt_tokens": 958,
-        "completion_tokens": 128,
-        "total_tokens": 1086,
-        "tool_calls": 0,
-        "llm_calls": 1,
-        "cost_usd": 0.0002205,
-        "projected_daily_cost_usd": 2.205
+        "latency_ms": 4207.91,
+        "prompt_tokens": 1008,
+        "completion_tokens": 133,
+        "total_tokens": 1141,
+        "tool_calls": 1,
+        "llm_calls": 2,
+        "cost_usd": 0.000231,
+        "projected_daily_cost_usd": 2.31
       }
     },
     {
@@ -812,18 +808,18 @@
         ],
         "action": "escalate_to_human",
         "confidence": 0.9,
-        "reasoning": "The ticket describes a platform unavailability issue, which qualifies as a service outage. Given the critical nature of the production environment, it requires immediate human intervention.",
+        "reasoning": "The ticket describes a platform unavailability issue, which qualifies as a service outage. Given the critical nature of the service being down for production systems, it is necessary to escalate this to a human for immediate attention.",
         "customer_history_summary": "No prior customer history found for C315.",
         "kb_summary": "",
         "safety_checks": [],
-        "latency_ms": 6123.39,
-        "prompt_tokens": 982,
-        "completion_tokens": 128,
-        "total_tokens": 1110,
+        "latency_ms": 6050.5,
+        "prompt_tokens": 1055,
+        "completion_tokens": 132,
+        "total_tokens": 1187,
         "tool_calls": 1,
         "llm_calls": 3,
-        "cost_usd": 0.0002241,
-        "projected_daily_cost_usd": 2.241
+        "cost_usd": 0.00023745,
+        "projected_daily_cost_usd": 2.3745
       }
     },
     {
@@ -853,26 +849,26 @@
         "ticket_id": "T316",
         "urgency": "critical",
         "product": "enterprise",
-        "issue_type": "service_outage",
+        "issue_type": "services",
         "sentiment": "frustrated",
         "language": "en",
         "intents": [
           "service_outage"
         ],
         "action": "escalate_to_human",
-        "confidence": 1.0,
-        "reasoning": "The ticket describes a critical service outage where customers cannot access the portal, indicating a significant impact on operations. This requires immediate human intervention.",
+        "confidence": 0.9,
+        "reasoning": "The ticket describes a complete unavailability of the portal across all regions, indicating a critical service outage that requires immediate human intervention.",
         "customer_history_summary": "No prior customer history found for C316.",
         "kb_summary": "",
         "safety_checks": [],
-        "latency_ms": 8806.8,
-        "prompt_tokens": 982,
-        "completion_tokens": 125,
-        "total_tokens": 1107,
+        "latency_ms": 4295.63,
+        "prompt_tokens": 1009,
+        "completion_tokens": 124,
+        "total_tokens": 1133,
         "tool_calls": 1,
-        "llm_calls": 3,
-        "cost_usd": 0.0002223,
-        "projected_daily_cost_usd": 2.223
+        "llm_calls": 2,
+        "cost_usd": 0.00022575,
+        "projected_daily_cost_usd": 2.2575
       }
     },
     {
@@ -914,14 +910,14 @@
         "customer_history_summary": "No prior customer history found for C317.",
         "kb_summary": "",
         "safety_checks": [],
-        "latency_ms": 7285.88,
-        "prompt_tokens": 981,
+        "latency_ms": 3820.63,
+        "prompt_tokens": 1008,
         "completion_tokens": 122,
-        "total_tokens": 1103,
+        "total_tokens": 1130,
         "tool_calls": 1,
-        "llm_calls": 3,
-        "cost_usd": 0.00022035,
-        "projected_daily_cost_usd": 2.2035
+        "llm_calls": 2,
+        "cost_usd": 0.0002244,
+        "projected_daily_cost_usd": 2.244
       }
     },
     {
@@ -958,19 +954,19 @@
           "service_outage"
         ],
         "action": "escalate_to_human",
-        "confidence": 1.0,
-        "reasoning": "The ticket indicates that the platform is unavailable, which qualifies as a service outage affecting payroll uploads. This is critical for enterprise operations and requires immediate human intervention.",
-        "customer_history_summary": "",
+        "confidence": 0.9,
+        "reasoning": "The ticket describes an inability to complete payroll uploads due to platform unavailability, which qualifies as a service outage. Given the critical nature of payroll processing for enterprises, this issue requires immediate human intervention.",
+        "customer_history_summary": "No prior customer history found for C318.",
         "kb_summary": "",
         "safety_checks": [],
-        "latency_ms": 3269.23,
-        "prompt_tokens": 956,
-        "completion_tokens": 125,
-        "total_tokens": 1081,
-        "tool_calls": 0,
-        "llm_calls": 1,
-        "cost_usd": 0.0002184,
-        "projected_daily_cost_usd": 2.184
+        "latency_ms": 5546.33,
+        "prompt_tokens": 1006,
+        "completion_tokens": 137,
+        "total_tokens": 1143,
+        "tool_calls": 1,
+        "llm_calls": 2,
+        "cost_usd": 0.0002331,
+        "projected_daily_cost_usd": 2.331
       }
     },
     {
@@ -1012,14 +1008,14 @@
         "customer_history_summary": "No prior customer history found for C319.",
         "kb_summary": "",
         "safety_checks": [],
-        "latency_ms": 5462.7,
-        "prompt_tokens": 982,
-        "completion_tokens": 123,
-        "total_tokens": 1105,
+        "latency_ms": 3949.98,
+        "prompt_tokens": 1009,
+        "completion_tokens": 125,
+        "total_tokens": 1134,
         "tool_calls": 1,
-        "llm_calls": 3,
-        "cost_usd": 0.0002211,
-        "projected_daily_cost_usd": 2.211
+        "llm_calls": 2,
+        "cost_usd": 0.00022635,
+        "projected_daily_cost_usd": 2.2635
       }
     },
     {
@@ -1064,14 +1060,14 @@
           "security breach reported",
           "customer data loss reported"
         ],
-        "latency_ms": 2404.58,
-        "prompt_tokens": 958,
+        "latency_ms": 3511.4,
+        "prompt_tokens": 970,
         "completion_tokens": 124,
-        "total_tokens": 1082,
+        "total_tokens": 1094,
         "tool_calls": 0,
         "llm_calls": 1,
-        "cost_usd": 0.0002181,
-        "projected_daily_cost_usd": 2.181
+        "cost_usd": 0.0002199,
+        "projected_daily_cost_usd": 2.199
       }
     },
     {
@@ -1113,14 +1109,14 @@
         "customer_history_summary": "",
         "kb_summary": "",
         "safety_checks": [],
-        "latency_ms": 2427.54,
-        "prompt_tokens": 960,
+        "latency_ms": 2644.8,
+        "prompt_tokens": 972,
         "completion_tokens": 113,
-        "total_tokens": 1073,
+        "total_tokens": 1085,
         "tool_calls": 0,
         "llm_calls": 1,
-        "cost_usd": 0.0002118,
-        "projected_daily_cost_usd": 2.118
+        "cost_usd": 0.0002136,
+        "projected_daily_cost_usd": 2.136
       }
     },
     {
@@ -1164,14 +1160,14 @@
         "safety_checks": [
           "prompt injection detected"
         ],
-        "latency_ms": 3293.37,
-        "prompt_tokens": 967,
+        "latency_ms": 2259.46,
+        "prompt_tokens": 979,
         "completion_tokens": 119,
-        "total_tokens": 1086,
+        "total_tokens": 1098,
         "tool_calls": 0,
         "llm_calls": 1,
-        "cost_usd": 0.00021645,
-        "projected_daily_cost_usd": 2.1645
+        "cost_usd": 0.00021825,
+        "projected_daily_cost_usd": 2.1825
       }
     },
     {
@@ -1201,7 +1197,7 @@
       },
       "actual": {
         "ticket_id": "T323",
-        "urgency": "high",
+        "urgency": "medium",
         "product": "web",
         "issue_type": "feature_request",
         "sentiment": "neutral",
@@ -1209,22 +1205,20 @@
         "intents": [
           "feature_request"
         ],
-        "action": "escalate_to_human",
-        "confidence": 0.0,
-        "reasoning": "Fallback triggered because the model output, tool context, or policy check was invalid or unsafe; the system escalated to a human for safety.",
-        "customer_history_summary": "No prior customer history found for C323.",
-        "kb_summary": "Knowledge base was not requested.",
-        "safety_checks": [
-          "fallback guardrail applied"
-        ],
-        "latency_ms": 6531.87,
-        "prompt_tokens": 978,
-        "completion_tokens": 54,
-        "total_tokens": 1032,
-        "tool_calls": 1,
-        "llm_calls": 4,
-        "cost_usd": 0.0001791,
-        "projected_daily_cost_usd": 1.791
+        "action": "route_to_specialist",
+        "confidence": 0.7,
+        "reasoning": "The customer has requested a feature change regarding the default dashboard language. Since there is no knowledge base evidence to support an auto-response, it is prudent to route this to a specialist for further assistance.",
+        "customer_history_summary": "",
+        "kb_summary": "",
+        "safety_checks": [],
+        "latency_ms": 6929.99,
+        "prompt_tokens": 989,
+        "completion_tokens": 133,
+        "total_tokens": 1122,
+        "tool_calls": 0,
+        "llm_calls": 2,
+        "cost_usd": 0.00022815,
+        "projected_daily_cost_usd": 2.2815
       }
     },
     {
@@ -1254,7 +1248,7 @@
       },
       "actual": {
         "ticket_id": "T324",
-        "urgency": "high",
+        "urgency": "medium",
         "product": "web",
         "issue_type": "bug",
         "sentiment": "frustrated",
@@ -1262,22 +1256,20 @@
         "intents": [
           "bug_report"
         ],
-        "action": "escalate_to_human",
-        "confidence": 0.0,
-        "reasoning": "Fallback triggered because the model output, tool context, or policy check was invalid or unsafe; the system escalated to a human for safety.",
+        "action": "route_to_specialist",
+        "confidence": 0.5,
+        "reasoning": "The customer reported a bug where the dashboard crashes when opening the analytics tab. There is no prior customer history and no relevant knowledge base entries to provide an auto-response. Therefore, it is best to route this to a specialist for further assistance.",
         "customer_history_summary": "No prior customer history found for C324.",
-        "kb_summary": "Knowledge base was not requested.",
-        "safety_checks": [
-          "fallback guardrail applied"
-        ],
-        "latency_ms": 6769.63,
-        "prompt_tokens": 979,
-        "completion_tokens": 53,
-        "total_tokens": 1032,
-        "tool_calls": 1,
+        "kb_summary": "No matching KB entries found; use general support workflow.",
+        "safety_checks": [],
+        "latency_ms": 9382.42,
+        "prompt_tokens": 1099,
+        "completion_tokens": 135,
+        "total_tokens": 1234,
+        "tool_calls": 2,
         "llm_calls": 4,
-        "cost_usd": 0.00017865,
-        "projected_daily_cost_usd": 1.7865
+        "cost_usd": 0.00024585,
+        "projected_daily_cost_usd": 2.4585
       }
     },
     {
@@ -1315,23 +1307,20 @@
         "intents": [
           "support_help"
         ],
-        "action": "route_to_specialist",
-        "confidence": 0.5,
-        "reasoning": "The ticket involves resetting MFA settings, which requires specialized assistance. There is no relevant knowledge base entry to support an auto-response, and the confidence level for a safe auto-response is low.",
+        "action": "auto_respond",
+        "confidence": 0.8,
+        "reasoning": "The customer is requesting assistance with resetting MFA settings, which falls under general support. The knowledge base indicates that password reset flows are available, and if issues persist, escalation is advised. Given the neutral sentiment and lack of urgency, an auto-response is appropriate.",
         "customer_history_summary": "No prior customer history found for C325.",
-        "kb_summary": "No matching KB entries found; use general support workflow.",
-        "safety_checks": [
-          "ungrounded_auto_respond",
-          "low_confidence_escalate"
-        ],
-        "latency_ms": 11103.89,
-        "prompt_tokens": 1020,
-        "completion_tokens": 138,
-        "total_tokens": 1158,
+        "kb_summary": "Password reset flows are available; if MFA issues persist, escalate to specialist.",
+        "safety_checks": [],
+        "latency_ms": 5210.78,
+        "prompt_tokens": 1063,
+        "completion_tokens": 142,
+        "total_tokens": 1205,
         "tool_calls": 2,
-        "llm_calls": 5,
-        "cost_usd": 0.0002358,
-        "projected_daily_cost_usd": 2.358
+        "llm_calls": 3,
+        "cost_usd": 0.00024465,
+        "projected_daily_cost_usd": 2.4465
       }
     },
     {
@@ -1371,18 +1360,18 @@
         ],
         "action": "auto_respond",
         "confidence": 0.8,
-        "reasoning": "The customer is asking for help with disabling push notifications, which is a general support question. The knowledge base does not provide specific guidance on this issue, but it is a low-risk inquiry.",
+        "reasoning": "The customer is asking for help with disabling push notifications, which is a general support question. The knowledge base does not provide a direct answer to this specific query, but it indicates that app issues may require clearing cache or reinstalling. Given the neutral sentiment and lack of urgency, an auto-response is appropriate.",
         "customer_history_summary": "No prior customer history found for C326.",
         "kb_summary": "Clear app cache and reinstall if the app crashes after update.",
         "safety_checks": [],
-        "latency_ms": 5269.38,
-        "prompt_tokens": 977,
-        "completion_tokens": 125,
-        "total_tokens": 1102,
+        "latency_ms": 6946.47,
+        "prompt_tokens": 1058,
+        "completion_tokens": 148,
+        "total_tokens": 1206,
         "tool_calls": 2,
         "llm_calls": 3,
-        "cost_usd": 0.00022155,
-        "projected_daily_cost_usd": 2.2155
+        "cost_usd": 0.0002475,
+        "projected_daily_cost_usd": 2.475
       }
     },
     {
@@ -1420,23 +1409,22 @@
         "intents": [
           "support_help"
         ],
-        "action": "route_to_specialist",
-        "confidence": 0.5,
-        "reasoning": "The ticket involves a request for help with account security settings, which is a sensitive topic that requires specialist attention. The knowledge base did not provide relevant information to address the customer's needs, and the urgency is assessed as high due to the nature of security-related inquiries.",
-        "customer_history_summary": "",
-        "kb_summary": "",
+        "action": "escalate_to_human",
+        "confidence": 0.0,
+        "reasoning": "Fallback triggered because the model output, tool context, or policy check was invalid or unsafe; the system escalated to a human for safety.",
+        "customer_history_summary": "No prior customer history found for C327.",
+        "kb_summary": "No matching KB entries found; use general support workflow.",
         "safety_checks": [
-          "ungrounded_auto_respond",
-          "low_confidence_escalate"
+          "fallback guardrail applied"
         ],
-        "latency_ms": 5691.34,
-        "prompt_tokens": 1037,
-        "completion_tokens": 159,
-        "total_tokens": 1196,
-        "tool_calls": 0,
-        "llm_calls": 2,
-        "cost_usd": 0.00025095,
-        "projected_daily_cost_usd": 2.5095
+        "latency_ms": 10313.83,
+        "prompt_tokens": 1068,
+        "completion_tokens": 129,
+        "total_tokens": 1197,
+        "tool_calls": 2,
+        "llm_calls": 5,
+        "cost_usd": 0.0002376,
+        "projected_daily_cost_usd": 2.376
       }
     },
     {
@@ -1466,7 +1454,7 @@
       },
       "actual": {
         "ticket_id": "T328",
-        "urgency": "high",
+        "urgency": "medium",
         "product": "web",
         "issue_type": "feature_request",
         "sentiment": "neutral",
@@ -1474,22 +1462,20 @@
         "intents": [
           "feature_request"
         ],
-        "action": "escalate_to_human",
-        "confidence": 0.0,
-        "reasoning": "Fallback triggered because the model output, tool context, or policy check was invalid or unsafe; the system escalated to a human for safety.",
-        "customer_history_summary": "No prior customer history found for C328.",
-        "kb_summary": "Knowledge base was not requested.",
-        "safety_checks": [
-          "fallback guardrail applied"
-        ],
-        "latency_ms": 9489.87,
-        "prompt_tokens": 979,
-        "completion_tokens": 165,
-        "total_tokens": 1144,
+        "action": "route_to_specialist",
+        "confidence": 0.5,
+        "reasoning": "The request for adding support for Thai language in the analytics report export is a feature request that requires further evaluation by a specialist, as there is no supporting knowledge base entry available.",
+        "customer_history_summary": "",
+        "kb_summary": "No matching KB entries found; use general support workflow.",
+        "safety_checks": [],
+        "latency_ms": 9564.12,
+        "prompt_tokens": 1051,
+        "completion_tokens": 127,
+        "total_tokens": 1178,
         "tool_calls": 1,
         "llm_calls": 4,
-        "cost_usd": 0.00024585,
-        "projected_daily_cost_usd": 2.4585
+        "cost_usd": 0.00023385,
+        "projected_daily_cost_usd": 2.3385
       }
     },
     {
@@ -1519,7 +1505,7 @@
       },
       "actual": {
         "ticket_id": "T329",
-        "urgency": "high",
+        "urgency": "medium",
         "product": "api",
         "issue_type": "bug",
         "sentiment": "frustrated",
@@ -1527,22 +1513,20 @@
         "intents": [
           "bug_report"
         ],
-        "action": "escalate_to_human",
-        "confidence": 0.0,
-        "reasoning": "Fallback triggered because the model output, tool context, or policy check was invalid or unsafe; the system escalated to a human for safety.",
+        "action": "route_to_specialist",
+        "confidence": 0.7,
+        "reasoning": "The customer is experiencing a bug with the API that returns 500 errors when optional headers are missing. This requires specialist attention to resolve the issue effectively.",
         "customer_history_summary": "No prior customer history found for C329.",
-        "kb_summary": "Knowledge base was not requested.",
-        "safety_checks": [
-          "fallback guardrail applied"
-        ],
-        "latency_ms": 5721.51,
-        "prompt_tokens": 981,
-        "completion_tokens": 53,
-        "total_tokens": 1034,
-        "tool_calls": 1,
-        "llm_calls": 4,
-        "cost_usd": 0.00017895,
-        "projected_daily_cost_usd": 1.7895
+        "kb_summary": "No matching KB entries found; use general support workflow.",
+        "safety_checks": [],
+        "latency_ms": 5891.2,
+        "prompt_tokens": 1058,
+        "completion_tokens": 117,
+        "total_tokens": 1175,
+        "tool_calls": 2,
+        "llm_calls": 3,
+        "cost_usd": 0.0002289,
+        "projected_daily_cost_usd": 2.289
       }
     },
     {
@@ -1574,7 +1558,7 @@
         "ticket_id": "T330",
         "urgency": "medium",
         "product": "support_portal",
-        "issue_type": "support_help",
+        "issue_type": "general_help",
         "sentiment": "neutral",
         "language": "en",
         "intents": [
@@ -1582,18 +1566,18 @@
         ],
         "action": "route_to_specialist",
         "confidence": 0.5,
-        "reasoning": "The ticket is a general support inquiry regarding billing contact and renewal schedule, but there is no matching knowledge base entry to provide an auto-response. Therefore, it is prudent to route this to a specialist for further assistance.",
+        "reasoning": "The ticket is a general help request regarding billing contact and renewal schedule, which requires specialist assistance due to lack of KB support.",
         "customer_history_summary": "No prior customer history found for C330.",
         "kb_summary": "No matching KB entries found; use general support workflow.",
         "safety_checks": [],
-        "latency_ms": 8060.07,
-        "prompt_tokens": 1021,
-        "completion_tokens": 131,
-        "total_tokens": 1152,
+        "latency_ms": 7814.58,
+        "prompt_tokens": 1102,
+        "completion_tokens": 113,
+        "total_tokens": 1215,
         "tool_calls": 2,
         "llm_calls": 4,
-        "cost_usd": 0.00023175,
-        "projected_daily_cost_usd": 2.3175
+        "cost_usd": 0.0002331,
+        "projected_daily_cost_usd": 2.331
       }
     }
   ]

@@ -118,6 +118,19 @@ class PolicyGuardrail:
             issues.append("critical tickets cannot be auto-responded.")
         if urgency in {"high", "critical"} and action == "auto_respond":
             issues.append("high-risk tickets require specialist or human escalation.")
+
+        if self._contains_any(
+            signal_text,
+            [
+                "locked out",
+                "cannot access",
+                "unable to access",
+                "mfa code is not working",
+                "cannot sign in",
+                "can't sign in",
+            ],
+        ) and action != "escalate_to_human":
+            issues.append("account access failures require human escalation (account_access_escalate)")
         if action == "auto_respond" and (
             self._contains_any(issue_type, ["billing", "chargeback", "dispute"])
             or self._contains_any(history, ["chargeback", "dispute", "unresolved payment", "unresolved payments", "unresolved"])

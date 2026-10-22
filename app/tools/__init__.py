@@ -48,7 +48,7 @@ class KBLookupTool:
         }
         self.fail_on_lookup = fail_on_lookup
 
-    def lookup(self, product: str, issue_type: str) -> ToolResult:
+    def lookup(self, product: str, issue_type: str, description: str = "") -> ToolResult:
         try:
             if self.fail_on_lookup:
                 raise RuntimeError("knowledge base lookup unavailable")
@@ -56,6 +56,20 @@ class KBLookupTool:
             matches = self.knowledge_base.get(search_key, [])
             if not matches and product:
                 matches = self.knowledge_base.get(product.lower(), [])
+            if not matches and description:
+                text = description.lower()
+                query_terms = {
+                    "login": ("login", "log in", "password", "mfa", "locked out", "account access"),
+                    "billing": ("billing", "invoice", "charge", "refund", "payment", "renewal"),
+                    "bug": ("bug", "error", "crash", "broken", "500"),
+                    "feature_request": ("feature", "support for", "add", "change the default"),
+                    "general_help": ("how do i", "where can i", "help", "setup", "settings"),
+                }
+                for key, terms in query_terms.items():
+                    if any(term in text for term in terms):
+                        matches = self.knowledge_base.get(key, [])
+                        if matches:
+                            break
             if not matches:
                 return ToolResult(success=True, summary="No matching KB entries found; use general support workflow.")
             return ToolResult(success=True, summary="; ".join(matches))

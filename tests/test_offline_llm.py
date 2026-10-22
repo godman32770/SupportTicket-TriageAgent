@@ -47,3 +47,10 @@ def test_offline_intent_uses_standard_taxonomy():
     assert outage["intents"] == ["service_outage"]
     assert billing["intents"] == ["billing_dispute"]
     assert prompt_injection["intents"] == ["prompt_injection"]
+
+
+def test_offline_routine_password_reset_is_not_escalated():
+    response = _generate("I cannot log in after password reset.")
+
+    assert response["urgency"] == "low"
+    assert response["action"] == "auto_respond"
