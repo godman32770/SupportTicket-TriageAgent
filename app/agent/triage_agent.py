@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+import re  
 import json
 import logging
 import time
@@ -73,14 +73,16 @@ class ToolRegistry:
             raise ValueError(f"Unknown tool: {name}")
         return spec.executor(ticket)
 
-#CLASSIFy URGENCY, EXTRACT FIELDS, DECIDE ACTION, REASON SAFELY, RETURN JSON ONLY
+# CLASSIFY URGENCY, EXTRACT FIELDS, DECIDE ACTION, REASON SAFELY, RETURN JSON ONLY
 
 def build_safe_fallback(ticket: SupportTicket, history: str, kb: str) -> dict[str, Any]:
     description = (ticket.description or "").lower()
     text = f"{description} {ticket.issue_type or ''}".lower()
 
-    critical_tokens = ("security", "breach", "data loss", "outage", "down", "legal", "urgent")
-    urgency = "critical" if any(token in text for token in critical_tokens) else "high"
+    _CRITICAL_PATTERN = re.compile(r"\b(security|breach(?:es)?|data loss|outages?|down|legal|urgent)\b")
+
+    # inside build_safe_fallback, replacing the critical_tokens lines:
+    urgency = "critical" if _CRITICAL_PATTERN.search(text) else "high"
     action = "escalate_to_human"
 
     intent_map = {
