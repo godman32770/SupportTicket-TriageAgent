@@ -8,6 +8,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from typing import Any, cast
 
+from app.guardrails.signals import detect_escalation_signals
 from app.models.triage import TRIAGE_SCHEMA
 from app.prompts.templates import build_prompt
 
@@ -157,6 +158,7 @@ class OfflineLLMClient(LLMClient):
             return json.dumps({"type": "tool_call", "name": "check_service_status"})
 
         description = str(ticket.get("description", "")).lower()
+        escalation_signals = detect_escalation_signals(f"{description} {issue}")
         urgency = _infer_urgency(description)
         action = "auto_respond"
         if urgency in {"critical", "high"}:
@@ -166,7 +168,10 @@ class OfflineLLMClient(LLMClient):
 
         intent = _resolve_intent(issue, description)
 
-        if "ignore previous instructions" in description or "prompt injection" in description or "bypass instructions" in description or "malicious" in description:
+        if escalation_signals:
+            urgency, action = "critical", "escalate_to_human"
+            intent = "legal_threat" if "gdpr" in escalation_signals else "security_threat" if {"privacy", "cross_tenant"} & escalation_signals else "service_outage"
+        elif "ignore previous instructions" in description or "prompt injection" in description or "bypass instructions" in description or "malicious" in description:
             urgency, action = "high", "escalate_to_human"
             intent = "prompt_injection"
         elif "data breach" in description or "security breach" in description or "customer data" in description:
