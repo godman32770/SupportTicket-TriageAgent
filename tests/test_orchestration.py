@@ -123,6 +123,25 @@ def test_content_calibration_escalates_suspected_breach():
     )
 
 
+@pytest.mark.parametrize("description", [
+    "Under GDPR Article 17, please erase all personal data.",
+    "Users from another organization can view our confidential documents; this is cross-tenant data exposure.",
+    "Our production API returns HTTP 429 and deployment is completely stalled.",
+])
+def test_new_sensitive_text_signals_are_escalated(description):
+    decision = _decision()
+    client = SequenceClient([{"type": "final", "decision": decision}])
+    result = TriageAgent(llm_client=client).run({
+        "ticket_id": "T-sensitive",
+        "customer_id": "C-sensitive",
+        "product": "support_platform",
+        "issue_type": "general_help",
+        "description": description,
+    })
+    assert result.urgency == "critical"
+    assert result.action == "escalate_to_human"
+
+
 def test_reasoning_is_regenerated_after_action_calibration():
     decision = _decision()
     decision.update({
@@ -263,3 +282,7 @@ def test_orchestrator_rejects_negative_iteration_limits():
 
     with pytest.raises(ValueError, match="max_tool_calls"):
         TriageAgent(max_tool_calls=-1)
+
+
+
+

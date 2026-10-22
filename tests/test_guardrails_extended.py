@@ -1,3 +1,5 @@
+import pytest
+
 from app.guardrails.policy import PolicyGuardrail
 
 
@@ -119,3 +121,28 @@ def test_security_breach_is_safe_when_escalating_to_human():
     )
     issues = policy.validate(d)
     assert not any("security" in issue.lower() or "legal" in issue.lower() for issue in issues)
+
+
+@pytest.mark.parametrize("description", [
+    "Please process this GDPR Article 17 erasure request.",
+    "Users from another organization can view our confidential data: cross-tenant exposure.",
+    "Our production API is returning HTTP 429 and all deployments are blocked.",
+])
+def test_new_sensitive_signals_require_critical_human_escalation(description):
+    policy = PolicyGuardrail()
+    unsafe = make_decision(
+        action="route_to_specialist",
+        urgency="high",
+        issue_type="general_help",
+        description=description,
+    )
+    issues = policy.validate(unsafe)
+    assert any("critical human escalation" in issue for issue in issues)
+
+    safe = make_decision(
+        action="escalate_to_human",
+        urgency="critical",
+        issue_type="security",
+        description=description,
+    )
+    assert not any("critical human escalation" in issue for issue in policy.validate(safe))
